@@ -75,6 +75,12 @@ composer.addPass(pluginPass);
 const BLOOM = 0.6;
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM, 0.6, 0.55);
 composer.addPass(bloom);
+// (a pixel that is not a number, NaN or infinite, which a shader can make (a Unity map's, say), left out of the glow:
+// blurred, it would spread over the whole picture and the frame come out black)
+bloom.materialHighPassFilter.fragmentShader = bloom.materialHighPassFilter.fragmentShader.replace(
+  "vec4 texel = texture2D( tDiffuse, vUv );",
+  "vec4 texel = texture2D( tDiffuse, vUv );\n\t\t\tif ( any( isnan( texel ) ) || any( isinf( texel ) ) ) texel = vec4( 0.0 );",
+);
 // the glow is added to the colour only: over such a hole it glows, without filling it
 Object.assign(bloom.blendMaterial, { blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
 // A dimension whose picture is never a window onto the page behind it (a plugin's opaque hook: saber's,
@@ -109,15 +115,17 @@ composer.addPass(screen.pass);
 // frame rate and whether frames keep time with the screen (vsync), the glow, smooth edges, how many videos play at once in the plugins' dimensions, and how
 // the view follows the mouse
 const gfx = {
-  resolution: "auto", fps: 0, vsync: true, bloom: true, aa: false, videos: 3, loops: 2, ease: "normal",
+  resolution: "auto", fps: 0, vsync: true, bloom: true, msaa: 2, videos: 3, loops: 2, ease: "normal",
   ...(() => { try { return JSON.parse(localStorage.getItem("vvoid.graphics")) ?? {}; } catch { return {}; } })(),
 };
+// (smooth edges once on or off (aa), now how many samples (msaa): on was four, off (as it was left) now two)
+if ("aa" in gfx) { gfx.msaa ??= gfx.aa ? 4 : 2; delete gfx.aa; }
 const meter = { frames: 0, time: 0, fps: 0 }; // frames a second, as drawn (shown in the graphics panel)
 let rawInput = null; // whether the mouse comes raw (known once the pointer has been taken: see lockPointer)
 const LOOK_EASES = { off: 0, light: 60, normal: 30, heavy: 14 }; // (higher: tighter; off: the view is where the mouse put it)
 function applyGraphics() {
   bloom.enabled = gfx.bloom;
-  const samples = gfx.aa ? 4 : 0;
+  const samples = gfx.msaa || 0;
   for (const target of [composer.renderTarget1, composer.renderTarget2]) {
     if (target.samples !== samples) { target.samples = samples; target.dispose(); } // (made again, so, at its next use)
   }
@@ -373,7 +381,7 @@ choices("gRes", Object.keys(RESOLUTIONS), "resolution", undefined, () => { ratio
 choices("gFps", [0, 120, 60, 30], "fps", (v) => (v ? String(v) : "no cap"), runFrames);
 choices("gVsync", [true, false], "vsync", (v) => (v ? "on" : "off"), runFrames);
 choices("gBloom", [true, false], "bloom", (v) => (v ? "on" : "off"), applyGraphics);
-choices("gAA", [false, true], "aa", (v) => (v ? "on" : "off"), applyGraphics);
+choices("gAA", [0, 2, 4], "msaa", (v) => (v ? `${v}x` : "off"), applyGraphics);
 choices("gVideos", [1, 2, 3, 6], "videos");
 choices("gLoops", [2, 4, 6, 10], "loops");
 choices("gEase", Object.keys(LOOK_EASES), "ease");
@@ -1757,6 +1765,22 @@ function paceHeadset(dt) {
   if (typical > 1 / 62 && p.reach > 0.35) { p.reach *= 0.8; p.wait = 2; }
   else if (typical < 1 / 85 && p.reach < 1) { p.reach = Math.min(1, p.reach * 1.1); p.wait = 6; }
 }
+// A plugin's own world drawn alone, on black: the void's sky, its places, its portals, every other plugin's world
+// left out of the picture while it is drawn (the saber plugin's Vivify maps, as Beat Saber shows them: 42-flux's
+// desert had the void behind it, and the way back to the hub hanging in its sky as a black disc in a red ring).
+// Irrlicht stays, and the lights. The scene's fog is left as it is (its materials would be made again each frame)
+const ALONE_BACKGROUND = new THREE.Color(0x000000);
+function isolate(only) {
+  const keep = new Set([only, camera, back.mouth, back.smoke, back.embers, back.notes].filter(Boolean));
+  const kept = { background: scene.background, hidden: [] };
+  for (const c of scene.children) if (!keep.has(c) && !c.isLight && c.visible) { c.visible = false; kept.hidden.push(c); }
+  scene.background = ALONE_BACKGROUND;
+  return kept;
+}
+function unisolate(kept) {
+  for (const c of kept.hidden) c.visible = true;
+  scene.background = kept.background;
+}
 function drawHeadset(dt) {
   paceHeadset(dt);
   audio.setSpeed(velocity.length());
@@ -1849,7 +1873,8 @@ function frame(now) {
   if (pluginDraws) { vrHud?.hide(); audio.setSpeed(velocity.length()); showPortalName(); showPanelsFor(); return; }
   if (xr?.on) return drawHeadset(dt);
   const shooting = cinema.shoot(camera, back); // (the camera at the shot for the picture, and given back after it)
-  world.sky.render(renderer, camera);
+  const alone = started ? hook("isolate") : null; // (a plugin's own world, drawn alone: see isolate)
+  if (!alone) world.sky.render(renderer, camera);
   if (document.visibilityState === "visible") adaptResolution(dt);
   audio.setSpeed(velocity.length());
   // the lens widens a little at speed, and narrows (zooms in) while the right button (or the controller's zoom) is held,
@@ -1865,7 +1890,8 @@ function frame(now) {
   drawn(camera, true, hook("far"), hook("near"));
   pluginPass.enabled = started && !!hook("posting"); // (a plugin's own pass, while it has one to draw)
   opaquePass.enabled = started && !!hook("opaque"); // (a dimension never seen through: see opaquePass)
-  composer.render(dt);
+  const isolated = alone ? isolate(alone) : null;
+  try { composer.render(dt); } finally { if (isolated) unisolate(isolated); }
   drawn(camera, false);
   if (shooting) cinema.restore(camera, back);
   if (map.open) map.draw(camera, viewYaw, world.realm);

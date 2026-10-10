@@ -26,8 +26,10 @@ uniform float uLight;
 varying float vT, vSide;
 varying vec3 vColor;
 void main(){
-  float across = 1. - vSide * vSide;
-  float along = pow(1. - vT, 1.6);
+  // (clamped: with MSAA a pixel on the edge is shaded where its samples are, a little past the tail's end,
+  // and pow of a negative number is NaN, which the glow then spreads over the whole picture)
+  float across = max(1. - vSide * vSide, 0.);
+  float along = pow(max(1. - vT, 0.), 1.6);
   gl_FragColor = vec4(vColor * across * along * uLight, 1.);
 }`;
 const HEAD_VERT = /* glsl */ `

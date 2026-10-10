@@ -195,7 +195,10 @@ export class VoidXR {
   // is, its distance from the play space's middle made so many times larger, and turned as it is turned:
   // the view itself is never scaled (three.js's own way scales it, and then whatever a shader measures in
   // the view, a point's size, a fade, comes out so many times off), so the scene is seen in its own units.
-  render(scene, { at, turn, scale, near, far }) {
+  // draw: how it is drawn, given the scene and the camera its eyes are put in (a plugin drawing each eye itself,
+  // through passes of its own: see the saber plugin's Vivify); else as it is, straight into the headset
+  render(scene, { at, turn, scale, near, far, draw = null }) {
+    const drawn = draw ?? ((s, c) => this.renderer.render(s, c));
     if (!this.session) {
       const c = this.preview;
       c.position.copy(this.head.position).multiplyScalar(scale).applyQuaternion(turn).add(at);
@@ -203,7 +206,7 @@ export class VoidXR {
       Object.assign(c, { near, far, fov: 80, aspect: window.innerWidth / window.innerHeight });
       c.updateProjectionMatrix();
       c.updateMatrixWorld();
-      this.renderer.render(scene, c);
+      drawn(scene, c);
       return;
     }
     if (this.depth[0] !== near || this.depth[1] !== far) {
@@ -220,7 +223,7 @@ export class VoidXR {
     }
     if (eyes.length === 2) union(array, eyes[0], eyes[1]);
     else if (eyes.length === 1) { array.matrixWorld.copy(eyes[0].matrixWorld); array.matrixWorldInverse.copy(eyes[0].matrixWorldInverse); array.projectionMatrix.copy(eyes[0].projectionMatrix); }
-    this.renderer.render(scene, this.camera);
+    drawn(scene, draw ? array : this.camera);
   }
   // vvoid's: the void, from the head in it (see place)
   draw(scene, far) {
