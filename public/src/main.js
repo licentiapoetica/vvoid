@@ -121,20 +121,22 @@ const screen = screenPass(); // the glass it is all seen through (Tab panel: scr
 composer.addPass(screen.pass);
 
 // The graphics panel's choices (Tab), remembered: resolution (auto follows the frame rate), a cap on the
-// frame rate and whether frames keep time with the screen (vsync), the glow, smooth edges, how many videos play at once in the plugins' dimensions, and how
+// frame rate and whether frames keep time with the screen (vsync), the glow, how many videos play at once in the plugins' dimensions, and how
 // the view follows the mouse
 const gfx = {
-  resolution: "auto", fps: 0, vsync: true, bloom: true, msaa: 2, videos: 3, loops: 2, ease: "normal",
+  resolution: "auto", fps: 0, vsync: true, bloom: true, videos: 3, loops: 2, ease: "normal",
   ...(() => { try { return JSON.parse(localStorage.getItem("vvoid.graphics")) ?? {}; } catch { return {}; } })(),
 };
-// (smooth edges once on or off (aa), now how many samples (msaa): on was four, off (as it was left) now two)
-if ("aa" in gfx) { gfx.msaa ??= gfx.aa ? 4 : 2; delete gfx.aa; }
+// (smooth edges (MSAA) no more, whatever was chosen before: of no use seen through the glow, and a picture
+// multisampled in its high range with a stencil was suspected of a friend's black flicker on Windows (Direct3D))
+delete gfx.aa;
+gfx.msaa = 0;
 const meter = { frames: 0, time: 0, fps: 0 }; // frames a second, as drawn (shown in the graphics panel)
 let rawInput = null; // whether the mouse comes raw (known once the pointer has been taken: see lockPointer)
 const LOOK_EASES = { off: 0, light: 60, normal: 30, heavy: 14 }; // (higher: tighter; off: the view is where the mouse put it)
 function applyGraphics() {
   bloom.enabled = gfx.bloom;
-  const samples = gfx.msaa || 0;
+  const samples = 0; // (see gfx.msaa)
   for (const target of [composer.renderTarget1, composer.renderTarget2]) {
     if (target.samples !== samples) { target.samples = samples; target.dispose(); } // (made again, so, at its next use)
   }
@@ -392,7 +394,6 @@ choices("gRes", Object.keys(RESOLUTIONS), "resolution", undefined, () => { ratio
 choices("gFps", [0, 120, 60, 30], "fps", (v) => (v ? String(v) : "no cap"), runFrames);
 choices("gVsync", [true, false], "vsync", (v) => (v ? "on" : "off"), runFrames);
 choices("gBloom", [true, false], "bloom", (v) => (v ? "on" : "off"), applyGraphics);
-choices("gAA", [0, 2, 4], "msaa", (v) => (v ? `${v}x` : "off"), applyGraphics);
 choices("gVideos", [1, 2, 3, 6], "videos");
 choices("gLoops", [2, 4, 6, 10], "loops");
 choices("gEase", Object.keys(LOOK_EASES), "ease");
