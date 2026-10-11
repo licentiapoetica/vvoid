@@ -1826,7 +1826,12 @@ function frame(now) {
   const heard = audio.features(dt);
   world.G.uBass.value = heard.bass; world.G.uMid.value = heard.mid; world.G.uHigh.value = heard.high; world.G.uBeat.value = heard.beat;
   world.G.uPulse.value = 0; // (a plugin keeping the nebula on its song's beat sets it again, in its update: see saber)
-  world.update(dt, camera, pluginDraws); // (as last frame had it: see the draw hook below)
+  // (a plugin's own world standing alone on black, loading or playing (the saber plugin's Vivify maps): the void's
+  // light worms rest, hidden and not moved, till it is over. The void itself stays as it is, the base everything
+  // comes back to)
+  const resting = started && !!hook("rest");
+  world.update(dt, camera, pluginDraws || resting); // (as last frame had it: see the draw hook below)
+  if (resting) world.worms.group.visible = false;
   meteors.update(dt, camera); // (behind the start screen too)
   lasers.update(dt);
   goo.update(dt, camera);
