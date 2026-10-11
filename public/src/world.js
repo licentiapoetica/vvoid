@@ -26,6 +26,21 @@ const BOUNCE = 0.55; // how much of the speed into a surface comes back out of i
 const inverseWorld = new THREE.Matrix4(), pieceWorld = new THREE.Matrix4();
 const local = new THREE.Vector3(), piece = new THREE.Vector3(), nearest = new THREE.Vector3(), normal = new THREE.Vector3();
 
+// What stands in a sector, drawn only while some of the sector is in sight (in the headset, of either eye's): each
+// of its objects bounded by a sphere round the whole sector, as three.js leaves an object out by its bounds. Its
+// motes wrap round inside its cube, its pieces stand well within it (swaying and swelling a little: see BOX_VERT),
+// so nothing of it is out of that sphere; a sector behind you was drawn all the same (all 125 round you, twice in
+// the headset). Not by distance: what is far goes into the fog's colour, not into nothing
+const SECTOR_BOUND = CELL * 0.9;
+const _origin = new THREE.Vector3();
+function boundBySector(object, lift = 0) {
+  object.frustumCulled = true;
+  // (an instanced mesh's own bounds, in its own space: scaled by UNIT and lifted in the sector)
+  const sphere = new THREE.Sphere(_origin, (SECTOR_BOUND + Math.abs(lift)) / (object.isInstancedMesh ? UNIT : 1));
+  if (object.isInstancedMesh) object.boundingSphere = sphere;
+  else object.geometry.boundingSphere = sphere;
+}
+
 const DRIFT = {
   rise: [0, 1, 0], fall: [0, -1, 0], stream: [1, 0.05, 0.3], orbit: [0, 0, 0], still: [0, 0, 0],
 };
@@ -93,7 +108,7 @@ class Cell {
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     });
     const points = new THREE.Points(geometry, material);
-    points.frustumCulled = false;
+    boundBySector(points);
     this.disposables.push(geometry, material);
     return points;
   }
@@ -117,6 +132,7 @@ class Cell {
       const mesh = this.addMesh(layer.primitive, instances, spec, this.mat, bands, 0, fractal);
       if (!mesh) continue;
       mesh.position.y = layer.lift * 170 * UNIT;
+      boundBySector(mesh, mesh.position.y);
       // a recursion stays upright: its descent turns about the vertical
       if (!fractal) mesh.rotation.set(layer.tilt * 1.2, 0, tiltZ);
       this.structures.push({ mesh, spin: layer.spin, fractal });
@@ -153,7 +169,7 @@ class Cell {
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       });
       const orbs = new THREE.Points(geometry, material);
-      orbs.frustumCulled = false;
+      boundBySector(orbs);
       this.group.add(orbs);
       this.disposables.push(geometry, material);
     }
@@ -189,7 +205,7 @@ class Cell {
     });
     geometry.setAttribute("aSeed", new THREE.InstancedBufferAttribute(seeds, 1));
     geometry.setAttribute("aTint", new THREE.InstancedBufferAttribute(tints, 1));
-    mesh.frustumCulled = false;
+    boundBySector(mesh);
     mesh.scale.setScalar(UNIT);
     this.group.add(mesh);
     this.disposables.push(geometry, material, mesh); // the mesh owns the per-instance matrix buffer
@@ -526,6 +542,27 @@ export class World {
     this.dust.frustumCulled = false;
     scene.add(this.dust);
     this.worms = new Worms(this); // (the light worms: see worms.js)
+  }
+
+  // The sectors' shaders made before a sector needs them, as saber makes a map's (one first met holds its frame
+  // while it is made: for seconds in a headset's own browser): each kind of piece (a cube, a faceted solid, a
+  // recursion of either), the motes, the orbs; for a picture drawn into target (the screen's passes), or straight
+  // into the headset (null: another program, its tone mapping its own). Kept, so their programs are kept
+  warm(camera, target) {
+    const { renderer } = this, stage = new THREE.Scene(), additive = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
+    for (const primitive of ["cube", "tetra"]) for (const fractal of [false, true]) {
+      const material = new THREE.ShaderMaterial({ vertexShader: BOX_VERT, fragmentShader: BOX_FRAG, defines: { ...(primitive === "cube" ? {} : { BARY: 1 }), ...(fractal ? { FRACTAL: 1 } : {}) } });
+      stage.add(new THREE.InstancedMesh(PRIMITIVES[primitive], material, 1));
+    }
+    const points = new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(new Float32Array(3), 3));
+    stage.add(new THREE.Points(points, new THREE.ShaderMaterial({ vertexShader: MOTE_VERT, fragmentShader: MOTE_FRAG, ...additive })));
+    stage.add(new THREE.Points(points, new THREE.ShaderMaterial({ vertexShader: ORB_VERT, fragmentShader: ORB_FRAG, ...additive })));
+    (this.warmed ??= []).push(stage);
+    const was = renderer.getRenderTarget();
+    renderer.setRenderTarget(target);
+    const done = renderer.compileAsync(stage, camera).catch(() => {});
+    renderer.setRenderTarget(was);
+    return done;
   }
 
   key(x, y, z) {

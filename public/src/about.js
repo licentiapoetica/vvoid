@@ -65,7 +65,7 @@ function pane(title, text) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
-  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide, toneMapped: false });
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide, forceSinglePass: true, toneMapped: false });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(WIDE, (WIDE * canvas.height) / canvas.width), material);
   mesh.renderOrder = 2;
   return mesh;

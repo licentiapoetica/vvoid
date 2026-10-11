@@ -126,7 +126,7 @@ export class Forming {
       motes.frustumCulled = false; // (where they are is the shader's: the empty box would be culled)
       group.add(motes);
       group.add(new THREE.Mesh(arc, new THREE.ShaderMaterial({ uniforms, vertexShader: ARC_VERT, fragmentShader: ARC_FRAG, ...additive })));
-      group.add(new THREE.Mesh(hole, new THREE.ShaderMaterial({ uniforms, vertexShader: HOLE_VERT, fragmentShader: HOLE_FRAG, side: THREE.DoubleSide, ...additive })));
+      group.add(new THREE.Mesh(hole, new THREE.ShaderMaterial({ uniforms, vertexShader: HOLE_VERT, fragmentShader: HOLE_FRAG, side: THREE.DoubleSide, forceSinglePass: true, ...additive })));
       const slot = hubSlot(name);
       group.position.set(...slot.at);
       group.quaternion.setFromUnitVectors(Z, new THREE.Vector3(...slot.in));

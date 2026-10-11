@@ -41,7 +41,7 @@ export class Lasers {
     if (this.beams.length >= MOST) this.drop(this.beams[0]);
     const u = { uColor: { value: new THREE.Color() }, uHead: { value: 0 }, uFade: { value: 1 }, uLen: { value: 1 }, uTime: this.world.G.uTime };
     const mesh = new THREE.Mesh(GEO, new THREE.ShaderMaterial({
-      uniforms: u, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      uniforms: u, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, forceSinglePass: true,
     }));
     mesh.frustumCulled = false;
     mesh.raycast = () => {};

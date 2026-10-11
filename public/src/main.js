@@ -25,6 +25,7 @@ import { Locks } from "./locks.js";
 import { Slots } from "./slots.js";
 import { Cinema, CINEMA_AFTER } from "./cinema.js";
 import { setViewReach, viewReach, drawn } from "./reach.js";
+import { HeadsetPace } from "./pace.js";
 import { TouchButtons } from "./touch.js";
 import { VoidXR, standalone } from "./xr.js";
 import { VoidHud } from "./vrhud.js";
@@ -178,6 +179,7 @@ function onSector(spec, shown, key) {
 const map = new VoidMap($("map"));
 const spawnAt = (() => { try { return JSON.parse(localStorage.getItem("vvoid.spawn")); } catch { return null; } })();
 const world = new World(scene, renderer, { onSector, onSpec: (key, spec) => map.add(key, spec) });
+world.warm(camera, composer.renderTarget1); // (the sectors' shaders made now, not as the first of each kind comes)
 for (const [key, spec] of world.specs) map.add(key, spec); // the hub and the two doors: fixed places, not what the cache remembers
 map.load();
 
@@ -1759,19 +1761,8 @@ function walked() {
 // sky, which the screen draws into a flat picture behind everything, is drawn into a small cube round
 // you instead (a flat picture cannot be behind both eyes at once), thirty times a second.
 let skyCube = null;
-// (a headset's frames come at its own rate, and missing them is felt: when they come late the void is
-// seen less far, a fifth at a time, and further again once there is room; its picture's size cannot
-// change while it is on)
-const headsetPace = { frames: [], reach: 1, wait: 0 };
-function paceHeadset(dt) {
-  const p = headsetPace;
-  p.frames.push(dt);
-  if ((p.wait -= dt) > 0 || p.frames.length < 90) return;
-  const typical = p.frames.sort((a, b) => a - b)[p.frames.length >> 1];
-  p.frames = [];
-  if (typical > 1 / 62 && p.reach > 0.35) { p.reach *= 0.8; p.wait = 2; }
-  else if (typical < 1 / 85 && p.reach < 1) { p.reach = Math.min(1, p.reach * 1.1); p.wait = 6; }
-}
+// (a headset's frames come at its own rate, and missing them is felt: see pace.js)
+let headsetPace = null;
 // A plugin's own world drawn alone, on black: the void's sky, its places, its portals, every other plugin's world
 // left out of the picture while it is drawn (the saber plugin's Vivify maps, as Beat Saber shows them: 42-flux's
 // desert had the void behind it, and the way back to the hub hanging in its sky as a black disc in a red ring).
@@ -1789,7 +1780,7 @@ function unisolate(kept) {
   scene.background = kept.background;
 }
 function drawHeadset(dt) {
-  paceHeadset(dt);
+  (headsetPace ??= new HeadsetPace(xr)).update(dt, vrHud.menuOpen);
   audio.setSpeed(velocity.length());
   xr.place(camera, viewYaw);
   if (!skyCube) {
@@ -1877,7 +1868,7 @@ function frame(now) {
   // a plugin drawing the picture itself (a headset's, see the saber plugin: the passes below are the
   // screen's, and a headset has none of them), and the rest of the frame's drawing left to it
   pluginDraws = started && !!hook("draw", renderer, dt);
-  if (pluginDraws) { vrHud?.hide(); audio.setSpeed(velocity.length()); showPortalName(); showPanelsFor(); return; }
+  if (pluginDraws) { headsetPace?.release(); vrHud?.hide(); audio.setSpeed(velocity.length()); showPortalName(); showPanelsFor(); return; }
   if (xr?.on) return drawHeadset(dt);
   const shooting = cinema.shoot(camera, back); // (the camera at the shot for the picture, and given back after it)
   const alone = started ? hook("isolate") : null; // (a plugin's own world, drawn alone: see isolate)
@@ -1983,6 +1974,7 @@ let vrSupported = false;
 function showVrButton() { vrButton.style.display = vrSupported && !xr.on ? "block" : "none"; }
 xr.supported().then((yes) => {
   vrSupported = yes;
+  if (yes) world.warm(camera, null); // (the sectors' shaders as the headset draws them: see World.warm)
   showVrButton();
   if (yes && standalone()) $("prompt").textContent = "click to materialize · in the headset";
 });

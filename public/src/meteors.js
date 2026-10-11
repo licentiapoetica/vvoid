@@ -38,7 +38,7 @@ export class Meteors {
       geometry.setIndex([0, 2, 1, 2, 3, 1]);
       const material = new THREE.ShaderMaterial({
         vertexShader: VERT, fragmentShader: FRAG, uniforms: { uColor: { value: new THREE.Color() }, uShow: { value: 0 } },
-        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, forceSinglePass: true,
       });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.frustumCulled = false;

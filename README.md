@@ -40,7 +40,10 @@ what happened, what the void says, Irrlicht) hangs on a pane below where you loo
 
 A headset needs vvoid on https (behind nginx, say) or on localhost; on a Quest over USB, `adb reverse
 tcp:5173 tcp:5173` and open `localhost:5173` in its browser. The picture in there is drawn without the
-screen's glow and glass. Plugins whose games are windows on the page (mania, say) cannot be seen in there;
+screen's glow and glass. It keeps up with the headset's frames: while they come late, each eye's picture is
+drawn a little smaller, then the void is seen less far, then the headset is asked for a step fewer frames
+(90 to 72 on a Quest 2), all of it given back slowly once they come on time (never with the menu up). On
+the screen as in there, a sector out of sight is not drawn. Plugins whose games are windows on the page (mania, say) cannot be seen in there;
 the menu's origin takes you out of them. The saber plugin is made for it.
 
 <details>

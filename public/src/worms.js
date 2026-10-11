@@ -92,7 +92,9 @@ export class Worms {
     geometry.setAttribute("aSide", new THREE.BufferAttribute(s, 1));
     geometry.setIndex(index);
     const additive = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
-    this.trails = new THREE.Mesh(geometry, new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: { uLight: G.uLight }, side: THREE.DoubleSide, ...additive }));
+    // (in one pass: three.js draws a see-through two-sided one twice, its back and then its front; light added, the
+    // order is nothing, and so the void's others: the lasers, the meteors, a forming portal's hole, an about's pane)
+    this.trails = new THREE.Mesh(geometry, new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: { uLight: G.uLight }, side: THREE.DoubleSide, forceSinglePass: true, ...additive }));
     this.trails.frustumCulled = false;
     // and the light at the head of each
     this.headPositions = new Float32Array(COUNT * 3);
