@@ -32,6 +32,7 @@ import { VoidHud } from "./vrhud.js";
 import { Arrival } from "./arrival.js";
 import { writePlace, readPlace } from "./share.js";
 import { LOOK, lookBase, setLook, saveName, defaults as lookDefaults } from "./look.js";
+import { PerfHud } from "./perfhud.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("view");
@@ -273,6 +274,7 @@ const store = (name, value) => {
 let sensitivity = stored("sensitivity", 1), invertY = stored("invertY", false);
 const padMap = new PadMap({ stored, store }); // the controller's buttons, as the player has them (Tab panel: controller)
 draggablePanels({ stored, store }); // the Tab panel's windows: moved and resized at will, remembered
+const perfHud = new PerfHud({ renderer, stored, store }); // how it runs, in a corner (F4: see perfhud.js)
 
 const entity = new Entity({ scene, world, audio, map, textEl: $("entity"), waitsEl: $("waits"), stored, store });
 // turn to face this way (the view eases round, the short way)
@@ -604,7 +606,7 @@ map.bind({
 });
 
 const HELP = {
-  keys: "mouse look · w a s d fly · q e roll · enter autofly · space / c rise, sink · shift surge (twice: faster) · r level out · v laser · j goo · - = volume · f fullscreen · tab map · b listen to the room · [ ] sensitivity · h keep hud · m mute · hold right zoom",
+  keys: "mouse look · w a s d fly · q e roll · enter autofly · space / c rise, sink · shift surge (twice: faster) · r level out · v laser · j goo · - = volume · f fullscreen · tab map · b listen to the room · [ ] sensitivity · h keep hud · m mute · hold right zoom · F4 how it runs",
   get pad() { return padMap.help("flight"); }, // (as the buttons are mapped: see pad.js)
 };
 let helpMode = "keys", noteTimer = 0, wakeTimer = 0;
@@ -1058,6 +1060,12 @@ async function toggleFullscreen() {
 // F11 does what F does, always. A page in fullscreen holding the keyboard (F, or bhop's) is handed F11 instead
 // of the browser, and a plugin may take every key while it plays (mania): so it is caught here, first. (The
 // browser's own fullscreen, from an F11 it was given before, is left to the browser to undo.)
+// F4: how it runs, over the picture (frames, work, what is drawn and kept, the plugins' own numbers), anywhere
+window.addEventListener("keydown", (e) => {
+  if (e.code !== "F4" || e.repeat || e.altKey) return;
+  e.preventDefault();
+  perfHud.toggle();
+}, true);
 window.addEventListener("keydown", (e) => {
   if (e.code !== "F11" || e.repeat) return;
   if (!document.fullscreenElement && matchMedia("(display-mode: fullscreen)").matches) return;
@@ -1801,7 +1809,24 @@ function drawHeadset(dt) {
 
 let elapsed = 0, last = performance.now(), coordsTimer = 0, seatedBefore = false;
 let watchAsk = 0; // (when next to ask what a tour holds you at: see back.watching)
+// each frame, timed for the F4 numbers: from the last to this, and how long vvoid's own work in it took (a plugin's
+// drawing, the headset's, all of it within)
+let lastFrameAt = 0;
 function frame(now) {
+  const began = performance.now(), gap = lastFrameAt ? now - lastFrameAt : 0;
+  lastFrameAt = now;
+  try { frameWork(now); } finally {
+    perfHud.record(now, gap, performance.now() - began);
+    if (perfHud.shown) perfHud.update(now, { drawn: lastDrawn, extra: metricsLines() });
+  }
+}
+// (vvoid's own lines, and every plugin's (its metrics hook: an array of lines), for the F4 numbers)
+function metricsLines() {
+  const lines = [`realm ${world.realm} · ${world.cells.size} sectors near${hook("rest") ? " · the void's extras resting" : ""}`];
+  for (const p of plugins) { try { const more = p.metrics?.(); if (Array.isArray(more)) lines.push(...more); } catch { /* a plugin's numbers not had */ } }
+  return lines;
+}
+function frameWork(now) {
   lastDrawn.calls = renderer.info.render.calls; lastDrawn.triangles = renderer.info.render.triangles;
   renderer.info.reset();
   const dt = Math.min((now - last) / 1000, 0.1);
