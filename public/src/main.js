@@ -54,7 +54,14 @@ let xr = null, vrHud = null;
 const camera = new THREE.PerspectiveCamera(70, 1, 1, CELL * 3.4); // far enough to see into the next sectors
 camera.rotation.order = "YXZ";
 
-const composer = new EffectComposer(renderer);
+// (its pictures with a stencil as well as a depth: what a plugin draws may mask by it, as 743+Aether's Unity shaders do,
+// four scenes at once each through its own window)
+const composer = (() => {
+  const size = renderer.getSize(new THREE.Vector2()), k = renderer.getPixelRatio();
+  const target = new THREE.WebGLRenderTarget(size.width * k, size.height * k, { type: THREE.HalfFloatType, stencilBuffer: true });
+  target.texture.name = "EffectComposer.rt1";
+  return new EffectComposer(renderer, target);
+})();
 composer.addPass(new RenderPass(scene, camera));
 // A plugin's own pass over the picture (its post hook: true when it drew), after the scene and before the
 // glow: on only while a plugin says it has something to draw (its posting hook), and costing nothing else
