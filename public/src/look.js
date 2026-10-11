@@ -53,7 +53,7 @@ export const LOOK = [
   { key: "blocksColourMix", glsl: "BLOCKS_COLOUR_MIX", group: "sky blocks", label: "colour override", min: 0, max: 1, step: 0.01, value: 0 },
   { key: "skyScale", group: "sky blocks", label: "sky sharpness", min: 0.25, max: 1, step: 0.05, value: 0.5 },
   // the light worms (see worms.js)
-  { key: "wormCount", group: "light worms", label: "how many", min: 0, max: 64, step: 1, value: 32 },
+  { key: "wormCount", group: "light worms", label: "how many", min: 0, max: 64, step: 1, value: 0 }, // (none unless an admin asks for them: the owner finds them too much)
   { key: "wormSpeed", group: "light worms", label: "speed", min: 0, max: 4, step: 0.01, value: 1 },
   { key: "wormTrail", group: "light worms", label: "trail (seconds)", min: 0.2, max: 6, step: 0.05, value: 2 },
   { key: "wormWidth", group: "light worms", label: "width", min: 0.1, max: 5, step: 0.01, value: 1 },
