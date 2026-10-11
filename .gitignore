@@ -7,3 +7,4 @@ persona/
 /plugins/
 # gumo: its site and pictures, your own files, kept local
 /gumo/
+.claude/settings.local.json

@@ -213,20 +213,24 @@ function showVvoid() {
   $("#vvoid-state").textContent = {
     running: `running · pid ${v.pid} · since ${time(v.startedAt)}`,
     starting: "starting…",
-    elsewhere: `running on :${v.port}, started elsewhere`,
+    elsewhere: `running on :${v.port}, started elsewhere${v.pid ? ` · pid ${v.pid}` : ""}`,
     stopped: v.ended ? `stopped · ended ${v.ended.signal ?? `with code ${v.ended.code}`} at ${time(v.ended.at)}` : "stopped",
   }[s];
   const open = $("#vvoid-open");
   open.hidden = !(s === "running" || s === "elsewhere");
   open.href = v.url ?? "#";
-  const here = s === "running" || s === "starting";
+  // (one started elsewhere: stopped from here too where the panel found it (its pid), and restarted here)
+  const here = s === "running" || s === "starting", found = s === "elsewhere" && !!v.pid;
   for (const b of document.querySelectorAll("[data-act]")) {
-    b.disabled = busy || (b.dataset.act === "start" ? s !== "stopped" : !here);
-    b.title = s === "elsewhere" ? "vvoid was started elsewhere: it can be stopped there" : "";
+    b.disabled = busy || (b.dataset.act === "start" ? s !== "stopped" : !here && !found);
+    b.title = s !== "elsewhere" ? "" : !found ? "vvoid was started elsewhere: it can be stopped there"
+      : b.dataset.act === "restart" ? "stop the one started elsewhere, and start it here" : b.dataset.act === "stop" ? "stop the one started elsewhere" : "";
   }
   $("#stale").hidden = !v.stale;
   $("#log-where").textContent = s === "elsewhere"
-    ? "vvoid was started elsewhere, not from this panel: what it writes is written there. Stop it there and start it here to read it here."
+    ? found
+      ? "vvoid was started elsewhere, not from this panel: what it writes is written there. Restart it to run it from here, and read it here."
+      : "vvoid was started elsewhere, not from this panel: what it writes is written there. Stop it there and start it here to read it here."
     : here ? "What vvoid writes, as it writes it (the last 3000 lines)." : "vvoid is not running. Start it from the top.";
 }
 let busy = false;

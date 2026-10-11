@@ -354,6 +354,36 @@ function stop() {
   });
   return stopping;
 }
+// one started elsewhere (npm start, node server.js), in this folder, as this user: found in /proc (Linux), and
+// stopped from here too (SIGTERM, SIGKILL after a while); a restart then starts it here, its log read here.
+// Anything else answering at its address (another user's, another folder's) is left be
+let elsewhereSeen = { at: 0, pids: [] };
+async function elsewhere() {
+  if (process.platform !== "linux") return [];
+  if (Date.now() - elsewhereSeen.at < 2000) return elsewhereSeen.pids;
+  const uid = process.getuid(), pids = [];
+  for (const name of await fs.readdir("/proc").catch(() => [])) {
+    const pid = Number(name);
+    if (!pid || pid === process.pid || pid === child?.pid) continue;
+    try {
+      if ((await fs.stat(`/proc/${pid}`)).uid !== uid || (await fs.readlink(`/proc/${pid}/cwd`)) !== here) continue;
+      const argv = (await fs.readFile(`/proc/${pid}/cmdline`, "utf8")).split("\0").filter(Boolean);
+      if (/^node/.test(path.basename(argv[0] ?? "")) && argv.slice(1).some((a) => a === "server.js" || a === path.join(here, "server.js"))) pids.push(pid);
+    } catch {}
+  }
+  return (elsewhereSeen = { at: Date.now(), pids }).pids;
+}
+// (gone: no longer there, or only its exit left for its parent to take)
+const alive = (pid) => fs.readFile(`/proc/${pid}/stat`, "utf8").then((s) => !/^\d+ \(.*\) Z/s.test(s), () => false);
+async function stopElsewhere(pids) {
+  const left = async () => (await Promise.all(pids.map(alive))).some(Boolean);
+  for (const pid of pids) try { process.kill(pid, "SIGTERM"); } catch {}
+  for (const until = Date.now() + 6000; Date.now() < until && (await left()); ) await new Promise((r) => setTimeout(r, 100));
+  for (const pid of pids) if (await alive(pid)) try { process.kill(pid, "SIGKILL"); } catch {}
+  for (const until = Date.now() + 2000; Date.now() < until && (await left()); ) await new Promise((r) => setTimeout(r, 100));
+  elsewhereSeen.at = 0;
+}
+
 // whether vvoid answers at its address (its settings as they are in .env now: for one started elsewhere, a guess)
 let probed = { at: 0, up: false };
 async function probe(set) {
@@ -380,7 +410,7 @@ async function vvoidState() {
   }
   return {
     state: child ? (up ? "running" : "starting") : up ? "elsewhere" : "stopped",
-    pid: child?.pid ?? null, startedAt: child ? startedAt : null, ended, port,
+    pid: child?.pid ?? (up ? (await elsewhere())[0] ?? null : null), startedAt: child ? startedAt : null, ended, port,
     stale: !!child && startedWith !== versionOf(text), // (.env changed since: a restart takes it up)
     base, url: base?.replace(/\/\/(127\.0\.0\.1|\[::1\])/, "//localhost"),
   };
@@ -884,8 +914,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await vvoidState());
     }
     if (act && m === "POST") {
-      if (act !== "stop" && !child && (await probe(settingsOf(parse(await readEnv())))).up) {
-        return send(res, 409, { error: "vvoid is running already, started elsewhere: stop it there first" });
+      if (!child && (await probe(settingsOf(parse(await readEnv())))).up) {
+        if (act === "start") return send(res, 409, { error: "vvoid is running already, started elsewhere: restart it to run it from here" });
+        const pids = await elsewhere();
+        if (!pids.length) return send(res, 409, { error: "vvoid is running, started elsewhere, but not as this user in this folder: stop it where it runs" });
+        note(`── vvoid started elsewhere (pid ${pids.join(", ")}) stopped from the panel ──`);
+        await stopElsewhere(pids);
+        probed.at = 0;
       }
       if (act !== "start") await stop();
       if (act !== "stop") await start();

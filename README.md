@@ -87,7 +87,8 @@ everything. More passkeys (one a device: "laptop", "phone") are made and taken a
 panel's passkeys tab; one for another of its addresses with a code given there (ten minutes, once), typed in
 at that address in place of the key. Every one lost: delete the passkeys' file on the server, and the key makes
 one again. The `.env` before each change is kept in `.cache/panel/env/`. vvoid started from the panel stops
-with it; one started elsewhere (`npm start`) is seen, but stopped and started where it was.
+with it; one started elsewhere (`npm start`) is seen, and, on Linux, as the panel's user in this folder, stopped
+from it too, or restarted there (then running from the panel, its log read there).
 
 | | default | |
 |---|---|---|
