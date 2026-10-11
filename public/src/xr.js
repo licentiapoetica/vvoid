@@ -9,6 +9,9 @@
 // hand's grip (where it holds) and ray (where it points), in the play space's metres (its floor at y 0),
 // their buttons and sticks. A plugin with a headset world of its own (the saber plugin) uses these, and
 // draws its own scene with its own camera in its draw hook.
+// Bare hands (hand tracking) stand in for controllers: a hand's grip is its fist, worked out from its joints so
+// that what it holds comes out of it on the thumb's side, tipped forward with the knuckles, as a sword is held;
+// a pinch is the trigger (button 0); a palm held open to your face a moment is the upper button (5)
 import * as THREE from "three";
 
 // a metre in the void's units: small, a person, a giant
@@ -18,6 +21,8 @@ export const standalone = () => /OculusBrowser|Quest|Pico|Wolvic|VIVE Focus|Vive
 const Y = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, "YXZ"), _s = new THREE.Vector3();
 const _l = new THREE.Vector3(), _r = new THREE.Vector3();
+const _m = new THREE.Matrix4();
+const PALM_HOLD = 0.8; // (seconds a palm is held to your face for the upper button)
 
 const hand = (side) => ({
   side, source: null,
@@ -59,7 +64,7 @@ export class VoidXR {
     if (this.session) return true;
     if (!window.isSecureContext) throw new Error("the headset needs vvoid on https (or localhost)");
     if (!navigator.xr) throw new Error("this browser has no WebXR");
-    const session = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor", "bounded-floor"] });
+    const session = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"] });
     const xr = this.renderer.xr;
     xr.enabled = true;
     xr.cameraAutoUpdate = false; // (the eyes are put in the world here: see render)
@@ -139,6 +144,8 @@ export class VoidXR {
       };
       put(source.gripSpace, h.grip);
       put(source.targetRaySpace, h.ray);
+      h.bare = !!source.hand;
+      if (source.hand) { this.bareHand(h, source, frame, xr.getReferenceSpace()); continue; }
       const pad = source.gamepad;
       h.buttons = pad ? pad.buttons.map((b) => b.pressed) : [];
       h.values = pad ? pad.buttons.map((b) => b.value) : [];
@@ -147,6 +154,42 @@ export class VoidXR {
     }
     for (const side of ["left", "right"]) if (!seen.has(side)) { const h = this.hands[side]; h.source = null; h.grip.ok = h.ray.ok = false; h.buttons = []; h.axes = [0, 0]; }
   }
+  // A bare hand (hand tracking): its grip, its pinch, its palm, from its joints (see the top)
+  bareHand(h, source, frame, space) {
+    const at = (name) => { const j = source.hand.get(name), p = j && frame.getJointPose?.(j, space); return p ? new THREE.Vector3().copy(p.transform.position) : null; };
+    const wrist = at("wrist"), index = at("index-finger-metacarpal"), pinky = at("pinky-finger-metacarpal"), mid = at("middle-finger-phalanx-proximal");
+    const now = performance.now() / 1000;
+    if (wrist && index && pinky && mid) {
+      const along = mid.clone().sub(wrist).normalize();            // (along the fingers)
+      const across = index.clone().sub(pinky).normalize();          // (across the hand, to the thumb's side)
+      // (out of the palm: for a right hand, along x across; for a left, across x along)
+      const palm = (h.side === "left" ? along.clone().cross(across) : across.clone().cross(along)).normalize();
+      // (what it holds: out of the fist on the thumb's side, tipped forward with the knuckles; its own -z)
+      const blade = across.clone().addScaledVector(along, 0.8).normalize(); // (about 40° forward of straight out of the fist: a sword as held; the saber plugin's tilt turns it further)
+      const up = palm.clone().negate().addScaledVector(blade, palm.dot(blade)).normalize(); // (the back of the hand, square to it)
+      const z = blade.clone().negate(), x = up.clone().cross(z).normalize();
+      h.grip.quaternion.setFromRotationMatrix(_m.makeBasis(x, up, z));
+      // (the fist's middle: by the knuckles, a little in towards the palm, where the fingers curl round)
+      h.grip.position.copy(mid).add(index).multiplyScalar(0.5).addScaledVector(palm, 0.035);
+      h.grip.ok = true;
+      // (a palm held open to your face, a moment: the upper button)
+      const centre = wrist.clone().lerp(mid, 0.5), toHead = this.head.position.clone().sub(centre);
+      const facing = toHead.length() < 0.6 && palm.dot(toHead.normalize()) > 0.8;
+      h.palmSince = facing ? h.palmSince ?? now : null;
+    } else h.palmSince = null;
+    // (a pinch: thumb's tip to index's tip, near; let go a little further apart, so it does not flicker)
+    const tip = at("index-finger-tip"), thumb = at("thumb-tip");
+    if (tip && thumb) { const d = tip.distanceTo(thumb); h.pinch = h.pinch ? d < 0.03 : d < 0.018; }
+    const upper = h.palmSince != null && now - h.palmSince > PALM_HOLD && !h.palmUsed;
+    if (upper) h.palmUsed = true;
+    if (h.palmSince == null) h.palmUsed = false;
+    h.buttons = [!!h.pinch, false, false, false, false, upper];
+    h.values = h.buttons.map((b) => (b ? 1 : 0));
+    h.axes = [0, 0];
+    h.seen = h.buttons;
+  }
+  // a hand: bare (tracked), not a controller (no sticks, no rumble)
+  bare(side) { return !!this.hands[side]?.bare; }
   hand(side) { const h = this.hands[side]; return h?.source || this.pretending ? h : null; }
   // the buttons, as the headsets' controllers have them: 0 trigger, 1 grip, 3 stick pressed, 4 A or X, 5 B or Y
   pressed(side, i) { const h = this.hands[side]; return !!h.buttons[i] && !h.was[i]; }
