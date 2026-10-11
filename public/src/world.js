@@ -569,6 +569,50 @@ export class World {
     return `${REALMS[this.realm]?.prefix ?? ""}${x},${y},${z}`;
   }
 
+  // A sector of the void seen from outside it, from another dimension (the saber plugin's Auto Vivify takes you to the
+  // hub through its black hole while you play, and draws it round you): built apart from the sectors round you, never
+  // one of them, hidden but for whoever draws it, in the void's own air for that drawing (see air). x, y, z: which (the
+  // hub's, by default: its clock); raw: its spec, where it is not known here (one fetched from the server's cache). Null
+  // if it is not known.
+  glimpse(x = 0, y = 0, z = 0, raw = null) {
+    const spec = raw ? normalizeSpec(raw) : this.specs.get(`${x},${y},${z}`);
+    if (!spec || spec.partial) return null;
+    const cell = new Cell(this, x, y, z);
+    cell.group.visible = false;
+    cell.materialize(spec);
+    cell.mat.value = cell.built.value = 1; cell.dustMat.value = 0.5; // (all there at once: no growing in, as it is come to)
+    const air = this.air(spec, { solid: true });
+    // (its things turned and faded in as they are round you; a recursion's descent asks where the eye is: far off)
+    const far = { position: new THREE.Vector3(1e9, 1e9, 1e9) };
+    return {
+      root: cell.group, spec, deep: new THREE.Color(spec.palette.deep),
+      update: (dt) => cell.update(dt, far),
+      begin: () => { cell.group.visible = true; air.begin(); },
+      end: () => { cell.group.visible = false; air.end(); },
+      dispose: () => cell.dispose(),
+    };
+  }
+
+  // A place's air (its fog, its colours, the void's look or a dimension's, as enter has them), put on for a drawing and
+  // taken off after: for what is drawn from somewhere you are not (see glimpse, and the plugins' own glimpses)
+  air(spec, { solid = !!spec.solid } = {}) {
+    const G = this.G, kept = {};
+    const want = {
+      uFogColor: new THREE.Color(spec.palette.fog), uDeep: new THREE.Color(spec.palette.deep), uGlow: new THREE.Color(spec.palette.glow),
+      uAccent: new THREE.Color(spec.palette.accent), uFogDensity: (0.0017 + (spec.fogDensity ?? 0.1) * 0.003) / SIGHT,
+      uSolid: solid ? 1 : 0, uBlocksMany: spec.blocks ?? 1, uLight: 1,
+    };
+    return {
+      begin() {
+        for (const [k, v] of Object.entries(want)) {
+          if (v.isColor) { (kept[k] ??= new THREE.Color()).copy(G[k].value); G[k].value.copy(v); }
+          else { kept[k] = G[k].value; G[k].value = v; }
+        }
+      },
+      end() { for (const [k, v] of Object.entries(kept)) { if (v.isColor) G[k].value.copy(v); else G[k].value = v; } },
+    };
+  }
+
   // Step into another grid of sectors: everything loaded is dropped and rebuilt around the traveller.
   setRealm(realm) {
     for (const cell of this.cells.values()) cell.dispose();
