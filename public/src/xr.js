@@ -87,7 +87,10 @@ export class VoidXR {
       session.end().catch(() => {});
       throw err;
     }
-    xr.setFoveation(1);
+    // (no foveation unless asked for (saber's MAP FOVEATION, while a Vivify map plays): on a Quest 2 it showed up the
+    // checker AreaLit drew in the headset, the middle of each eye's picture darker, its edge a rectangle that went
+    // wherever you looked)
+    xr.setFoveation(0);
     this.session = session;
     this.asked = null;
     this.rate(this.wanted);
