@@ -1710,7 +1710,12 @@ function runFrames() {
   const run = ++freeRunning;
   // (a headset's frames come only through the loop, every one of them drawn: no cap, whatever the choice)
   if (gfx.vsync || renderer.xr.isPresenting) {
-    renderer.setAnimationLoop((now) => {
+    renderer.setAnimationLoop((now, xrFrame) => {
+      // (in the headset, only its own frames: three.js starts the page's loop again whenever the loop is set, even
+      // with a session on, and a desktop browser (Chromium on Linux, through OpenXR) goes on ticking it, so
+      // everything was stepped twice a frame, the second time with the hands' last poses; a Quest's browser
+      // never ticks it in there)
+      if (renderer.xr.isPresenting && !xrFrame) return;
       if (gfx.fps && !renderer.xr.isPresenting && now - last < 1000 / gfx.fps - 1) return; // (this refresh sits out)
       frame(now);
     });
@@ -1821,7 +1826,10 @@ let lastFrameAt = 0;
 function frame(now) {
   const began = performance.now(), gap = lastFrameAt ? now - lastFrameAt : 0;
   lastFrameAt = now;
-  try { frameWork(now); } finally {
+  try {
+    frameWork(now);
+    if (xr.session) xr.mirror(); // (the headset's picture on the screen too, once all of it is drawn)
+  } finally {
     perfHud.record(now, gap, performance.now() - began);
     if (perfHud.shown) perfHud.update(now, { drawn: lastDrawn, extra: metricsLines() });
   }

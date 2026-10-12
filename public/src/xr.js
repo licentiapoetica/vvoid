@@ -212,6 +212,30 @@ export class VoidXR {
       else pad?.vibrationActuator?.playEffect?.("dual-rumble", { duration: ms, strongMagnitude: strength, weakMagnitude: strength });
     } catch { /* none */ }
   }
+  // The screen's picture while you are in the headset (to watch, or stream): the left eye's, as the headset was given
+  // it, copied onto the page (nothing drawn again), cut to the window's shape round where the eye looks straight
+  // ahead (an eye's picture is off its middle). Not in a headset's own browser (Android): no screen to see it there.
+  // Only where the headset's picture is one layer (WebXR's layers, the projection layer, not read from here).
+  mirror() {
+    const layer = this.session?.renderState.baseLayer, eye = this.renderer.xr.getCamera().cameras[0];
+    const canvas = this.renderer.domElement, aspect = canvas.clientWidth / canvas.clientHeight;
+    if (MIRRORLESS || !layer || !eye?.viewport || !(aspect > 0)) return;
+    const gl = this.renderer.getContext(), vp = eye.viewport, P = eye.projectionMatrix.elements;
+    // (straight ahead, in the eye's picture: where its projection puts the point on its axis)
+    const ax = vp.x + ((1 - P[8]) / 2) * vp.z, ay = vp.y + ((1 - P[9]) / 2) * vp.w;
+    let hx = Math.min(ax - vp.x, vp.x + vp.z - ax), hy = Math.min(ay - vp.y, vp.y + vp.w - ay);
+    if (hx / hy > aspect) hx = hy * aspect;
+    else hy = hx / aspect;
+    // (three.js's bindings put back as they were, so its own record of them stays true; a blit is cut by the scissor)
+    const read = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING), draw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING), scissor = gl.isEnabled(gl.SCISSOR_TEST);
+    if (scissor) gl.disable(gl.SCISSOR_TEST);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, layer.framebuffer);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.blitFramebuffer(ax - hx, ay - hy, ax + hx, ay + hy, 0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.COLOR_BUFFER_BIT, gl.LINEAR);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, draw);
+    if (scissor) gl.enable(gl.SCISSOR_TEST);
+  }
   // how far the head is turned about its up, in the play space
   headYaw() { return _e.setFromQuaternion(this.head.quaternion, "YXZ").y; }
 
@@ -283,6 +307,7 @@ export class VoidXR {
 // the frame, before it asks where in the picture each is drawn (the headset gives a smaller part then). Put
 // in once, the first time the headset is put on.
 const VIEW_SCALE = typeof XRView !== "undefined" && "requestViewportScale" in XRView.prototype;
+const MIRRORLESS = /Android/i.test(navigator.userAgent); // (see mirror)
 let viewScale = 1, viewScaled = 1;
 function scaleViews() {
   if (!VIEW_SCALE || scaleViews.done) return;
