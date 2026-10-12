@@ -26,6 +26,7 @@ import { Slots } from "./slots.js";
 import { Cinema, CINEMA_AFTER } from "./cinema.js";
 import { setViewReach, viewReach, drawn } from "./reach.js";
 import { HeadsetPace } from "./pace.js";
+import { drawCubeFace } from "./cubeface.js";
 import { TouchButtons } from "./touch.js";
 import { VoidXR, standalone } from "./xr.js";
 import { VoidHud } from "./vrhud.js";
@@ -1768,7 +1769,9 @@ function walked() {
 }
 // The picture in the headset: the scene from the head, straight (vvoid's passes are the screen's). The
 // sky, which the screen draws into a flat picture behind everything, is drawn into a small cube round
-// you instead (a flat picture cannot be behind both eyes at once), thirty times a second.
+// you instead (a flat picture cannot be behind both eyes at once): a face of it a frame, so its six pictures are
+// not all drawn in one frame, felt as a judder (see cubeface.js); the whole of it at once only when it is first
+// drawn, or drawn again after a while unseen (the headset off, a plugin drawing the picture)
 let skyCube = null;
 // (a headset's frames come at its own rate, and missing them is felt: see pace.js)
 let headsetPace = null;
@@ -1794,10 +1797,12 @@ function drawHeadset(dt) {
   xr.place(camera, viewYaw);
   if (!skyCube) {
     const target = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType });
-    skyCube = { target, camera: new THREE.CubeCamera(1, 6000, target), wait: 0 };
+    skyCube = { target, camera: new THREE.CubeCamera(1, 6000, target), face: 0, at: -Infinity };
   }
   skyCube.camera.position.copy(camera.position);
-  if ((skyCube.wait -= dt) <= 0) { skyCube.wait = 1 / 30; skyCube.camera.update(renderer, world.sky.scene); }
+  if (elapsed - skyCube.at > 0.5) skyCube.camera.update(renderer, world.sky.scene);
+  else { drawCubeFace(skyCube.camera, renderer, world.sky.scene, skyCube.face); skyCube.face = (skyCube.face + 1) % 6; }
+  skyCube.at = elapsed;
   scene.background = skyCube.target.texture;
   world.G.uPx.value = 1.8; // (points as large, against the headset's eyes, as against the screen)
   vrHud.update(dt, camera, { fade: Number(fadeEl.style.opacity) || 0, speed: velocity.length(), seated: !!hook("seat") });

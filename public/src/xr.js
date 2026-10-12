@@ -22,6 +22,7 @@ const Y = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, "YXZ"), _s = new THREE.Vector3();
 const _l = new THREE.Vector3(), _r = new THREE.Vector3();
 const _m = new THREE.Matrix4();
+const BARE = Object.fromEntries(["wrist", "index", "pinky", "mid", "tip", "thumb", "along", "across", "palm", "blade", "up", "z", "x", "centre", "toHead"].map((k) => [k, new THREE.Vector3()])); // (see bareHand: one hand at a time)
 const PALM_HOLD = 0.8; // (seconds a palm is held to your face for the upper button)
 
 const hand = (side) => ({
@@ -156,29 +157,30 @@ export class VoidXR {
   }
   // A bare hand (hand tracking): its grip, its pinch, its palm, from its joints (see the top)
   bareHand(h, source, frame, space) {
-    const at = (name) => { const j = source.hand.get(name), p = j && frame.getJointPose?.(j, space); return p ? new THREE.Vector3().copy(p.transform.position) : null; };
-    const wrist = at("wrist"), index = at("index-finger-metacarpal"), pinky = at("pinky-finger-metacarpal"), mid = at("middle-finger-phalanx-proximal");
+    // (each joint, and what is worked out from them, in vectors kept for it, not new ones each frame: see BARE)
+    const at = (name, out) => { const j = source.hand.get(name), p = j && frame.getJointPose?.(j, space); return p ? out.copy(p.transform.position) : null; };
+    const wrist = at("wrist", BARE.wrist), index = at("index-finger-metacarpal", BARE.index), pinky = at("pinky-finger-metacarpal", BARE.pinky), mid = at("middle-finger-phalanx-proximal", BARE.mid);
     const now = performance.now() / 1000;
     if (wrist && index && pinky && mid) {
-      const along = mid.clone().sub(wrist).normalize();            // (along the fingers)
-      const across = index.clone().sub(pinky).normalize();          // (across the hand, to the thumb's side)
+      const along = BARE.along.subVectors(mid, wrist).normalize();      // (along the fingers)
+      const across = BARE.across.subVectors(index, pinky).normalize();  // (across the hand, to the thumb's side)
       // (out of the palm: for a right hand, along x across; for a left, across x along)
-      const palm = (h.side === "left" ? along.clone().cross(across) : across.clone().cross(along)).normalize();
+      const palm = (h.side === "left" ? BARE.palm.crossVectors(along, across) : BARE.palm.crossVectors(across, along)).normalize();
       // (what it holds: out of the fist on the thumb's side, tipped forward with the knuckles; its own -z)
-      const blade = across.clone().addScaledVector(along, 0.8).normalize(); // (about 40° forward of straight out of the fist: a sword as held; the saber plugin's tilt turns it further)
-      const up = palm.clone().negate().addScaledVector(blade, palm.dot(blade)).normalize(); // (the back of the hand, square to it)
-      const z = blade.clone().negate(), x = up.clone().cross(z).normalize();
+      const blade = BARE.blade.copy(across).addScaledVector(along, 0.8).normalize(); // (about 40° forward of straight out of the fist: a sword as held; the saber plugin's tilt turns it further)
+      const up = BARE.up.copy(palm).negate().addScaledVector(blade, palm.dot(blade)).normalize(); // (the back of the hand, square to it)
+      const z = BARE.z.copy(blade).negate(), x = BARE.x.crossVectors(up, z).normalize();
       h.grip.quaternion.setFromRotationMatrix(_m.makeBasis(x, up, z));
       // (the fist's middle: by the knuckles, a little in towards the palm, where the fingers curl round)
       h.grip.position.copy(mid).add(index).multiplyScalar(0.5).addScaledVector(palm, 0.035);
       h.grip.ok = true;
       // (a palm held open to your face, a moment: the upper button)
-      const centre = wrist.clone().lerp(mid, 0.5), toHead = this.head.position.clone().sub(centre);
+      const centre = BARE.centre.copy(wrist).lerp(mid, 0.5), toHead = BARE.toHead.subVectors(this.head.position, centre);
       const facing = toHead.length() < 0.6 && palm.dot(toHead.normalize()) > 0.8;
       h.palmSince = facing ? h.palmSince ?? now : null;
     } else h.palmSince = null;
     // (a pinch: thumb's tip to index's tip, near; let go a little further apart, so it does not flicker)
-    const tip = at("index-finger-tip"), thumb = at("thumb-tip");
+    const tip = at("index-finger-tip", BARE.tip), thumb = at("thumb-tip", BARE.thumb);
     if (tip && thumb) { const d = tip.distanceTo(thumb); h.pinch = h.pinch ? d < 0.03 : d < 0.018; }
     const upper = h.palmSince != null && now - h.palmSince > PALM_HOLD && !h.palmUsed;
     if (upper) h.palmUsed = true;

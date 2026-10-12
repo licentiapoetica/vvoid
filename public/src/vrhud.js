@@ -54,6 +54,35 @@ function wrap(g, text, size, max) {
   if (now) out.push(now);
   return out;
 }
+// The words' pane, as strips: each kind of words (the place's name, what Irrlicht says, ...) on a strip of its own,
+// written when its words change and faded by its strip's opacity. The pane as one canvas was written again, and
+// sent to the card whole (1100 by 623), at every step of any fade: felt in a headset. Each strip spans the
+// pane's width, rows px high, and is put at a row of the pane (top, in its px from the pane's top)
+const PANE_W = 1.5, PANE_H = 0.85, PANE_PX = 1100, PANE_PY = Math.round((PANE_PX * PANE_H) / PANE_W);
+function strip(rows) {
+  const canvas = Object.assign(document.createElement("canvas"), { width: PANE_PX, height: rows });
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(PANE_W, (PANE_H * rows) / PANE_PY), new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
+  mesh.renderOrder = 1001;
+  mesh.frustumCulled = false;
+  mesh.visible = false;
+  return { canvas, g: canvas.getContext("2d"), texture, mesh, rows, said: null };
+}
+// a strip's words (write: drawing them, in its own px, at full strength), written again only when key changes;
+// shown at alpha, its top at row top of the pane
+function show(s, key, alpha, top, write) {
+  s.mesh.visible = !!key && alpha > 0.01;
+  if (!s.mesh.visible) return;
+  if (key !== s.said) {
+    s.said = key;
+    s.g.clearRect(0, 0, PANE_PX, s.rows);
+    write(s.g);
+    s.texture.needsUpdate = true;
+  }
+  s.mesh.material.opacity = Math.min(1, alpha);
+  s.mesh.position.y = PANE_H * (0.5 - (top + s.rows / 2) / PANE_PY);
+}
 
 export class VoidHud {
   // act: what the menu does ({ origin, back, autofly, mute, volume(+1/-1), leave, say }); locks: vvoid's
@@ -84,11 +113,17 @@ export class VoidHud {
     this.edge.renderOrder = 1000;
     this.head.add(this.edge);
     // the words, on a pane a little below where you look (it follows the head gently)
-    this.words = pane(1.5, 0.85, 1100);
+    // (each strip as high as its words and their shadow: see say)
+    this.words = new THREE.Group();
+    this.strips = {
+      portal: strip(80), note: strip(72), asking: strip(120), entity: strip(140), irrlicht: strip(140),
+      name: strip(120), inscription: strip(96), waits: strip(48), status: strip(48), help: strip(44),
+    };
+    for (const s of Object.values(this.strips)) this.words.add(s.mesh);
     this.follow = new THREE.Group();
     this.follow.visible = false;
-    this.follow.add(this.words.mesh);
-    this.words.mesh.position.set(0, -0.3, -1.6);
+    this.follow.add(this.words);
+    this.words.position.set(0, -0.3, -1.6);
     scene.add(this.follow);
     this.followTurn = new THREE.Quaternion();
     // the hands, two small lights
@@ -144,47 +179,44 @@ export class VoidHud {
     for (const m of this.handMarks) m.visible = false;
   }
 
-  // the page's words as they are now, written on the pane when anything of them changed
+  // the page's words as they are now: each strip written again when its words changed, and faded as they are
   say() {
-    const el = (id) => $(id), q = (x) => Math.round(x * 12) / 12;
+    const el = (id) => $(id);
     const portal = el("hubPortalName"), asking = this.locks.asking;
     const parts = {
-      name: el("name")?.textContent, inscription: el("inscription")?.textContent, sector: q(shown(el("sector"))),
-      status: el("status")?.textContent, meta: q(shown(el("meta"))), color: el("meta")?.style.color,
-      note: el("note")?.textContent, noteOn: q(shown(el("note"))),
-      portal: portal?.textContent, portalOn: q(shown(portal)),
-      entity: el("entity")?.textContent, entityOn: q(shown(el("entity"))),
-      irrlicht: el("irrlicht")?.textContent, irrlichtOn: q(shown(el("irrlicht"))),
+      name: el("name")?.textContent, inscription: el("inscription")?.textContent, sector: shown(el("sector")),
+      status: el("status")?.textContent, meta: shown(el("meta")), color: el("meta")?.style.color,
+      note: el("note")?.textContent, noteOn: shown(el("note")),
+      portal: portal?.textContent, portalOn: shown(portal),
+      entity: el("entity")?.textContent, entityOn: shown(el("entity")),
+      irrlicht: el("irrlicht")?.textContent, irrlichtOn: shown(el("irrlicht")),
       waits: el("waits")?.textContent, help: document.body.classList.contains("seated") ? el("help")?.textContent : "",
       asking: asking ? document.querySelector("#lockGate h2, .lock h2")?.textContent || asking : "",
     };
-    const key = JSON.stringify(parts);
-    const w = this.words;
-    if (key === w.said) return;
-    w.said = key;
-    const g = w.g, W = w.canvas.width, H = w.canvas.height;
-    g.clearRect(0, 0, W, H);
+    // (each line where the one canvas had it, W by H, its middle at y: a strip from y - rows / 2)
+    const W = PANE_PX, H = PANE_PY, st = this.strips;
+    const one = (s, text, y, size, opts = {}) => show(s, text && JSON.stringify([text, opts.color]), opts.alpha ?? 1, y - s.rows / 2, (g) => line(g, text, W / 2, s.rows / 2, size, { ...opts, alpha: 1 }));
     // under the crosshair (the pane's top is a little below it): what you look at, then a word on what happened
-    line(g, parts.portal, W / 2, 34, 34, { alpha: parts.portalOn, color: "#bfe6ff", spacing: 2 });
-    line(g, parts.note, W / 2, 84, 30, { alpha: parts.noteOn, spacing: 1 });
-    if (parts.asking) {
-      line(g, `${parts.asking} asks for its password`, W / 2, 150, 34, { color: "#ffd8a0" });
-      line(g, "give it on the screen first (it can be remembered) · a trigger turns away", W / 2, 196, 24, { alpha: 0.75 });
-    }
-    // what the void says, and what Irrlicht says
+    one(st.portal, parts.portal, 34, 34, { alpha: parts.portalOn, color: "#bfe6ff", spacing: 2 });
+    one(st.note, parts.note, 84, 30, { alpha: parts.noteOn, spacing: 1 });
+    show(st.asking, parts.asking, 1, 120, (g) => {
+      line(g, `${parts.asking} asks for its password`, W / 2, 30, 34, { color: "#ffd8a0" });
+      line(g, "give it on the screen first (it can be remembered) · a trigger turns away", W / 2, 76, 24, { alpha: 0.75 });
+    });
+    // what the void says, and what Irrlicht says (up to three lines each, one under the other)
     let y = 250;
-    for (const [text, on, color] of [[parts.entity, parts.entityOn, "#f2e6ff"], [parts.irrlicht, parts.irrlichtOn, "#cfe9ff"]]) {
-      if (!text || on < 0.02) continue;
-      for (const l of wrap(g, text, 30, W - 160).slice(0, 3)) { line(g, l, W / 2, y, 30, { alpha: on, color }); y += 40; }
-      y += 14;
+    for (const [s, text, on, color] of [[st.entity, parts.entity, parts.entityOn, "#f2e6ff"], [st.irrlicht, parts.irrlicht, parts.irrlichtOn, "#cfe9ff"]]) {
+      const lines = text && on >= 0.02 ? wrap(s.g, text, 30, W - 160).slice(0, 3) : [];
+      show(s, lines.length ? text : null, on, y - 30, (g) => lines.forEach((l, k) => line(g, l, W / 2, 30 + k * 40, 30, { color })));
+      if (lines.length) y += lines.length * 40 + 14;
     }
     // where you are
-    line(g, parts.name, W / 2, H - 170, 52, { alpha: parts.sector, weight: 200, spacing: 8, max: W - 60 });
-    for (const [i, l] of wrap(g, parts.inscription, 26, W - 140).slice(0, 2).entries()) line(g, l, W / 2, H - 116 + i * 34, 26, { alpha: parts.sector * 0.85 });
-    line(g, parts.waits, W / 2, H - 52, 20, { alpha: parts.meta, spacing: 3 });
-    line(g, parts.status, W / 2, H - 22, 20, { alpha: parts.meta, color: parts.color || "#cfd8ff", spacing: 1, max: W - 60 });
-    if (parts.help) line(g, parts.help, W / 2, H - 22, 18, { alpha: 0.6, max: W - 40 });
-    w.texture.needsUpdate = true;
+    one(st.name, parts.name, H - 170, 52, { alpha: parts.sector, weight: 200, spacing: 8, max: W - 60 });
+    const inscription = wrap(st.inscription.g, parts.inscription ?? "", 26, W - 140).slice(0, 2);
+    show(st.inscription, inscription.length ? parts.inscription : null, parts.sector * 0.85, H - 116 - 30, (g) => inscription.forEach((l, k) => line(g, l, W / 2, 30 + k * 34, 26)));
+    one(st.waits, parts.waits, H - 52, 20, { alpha: parts.meta, spacing: 3 });
+    one(st.status, parts.status, H - 22, 20, { alpha: parts.meta, color: parts.color || "#cfd8ff", spacing: 1, max: W - 60 });
+    one(st.help, parts.help, H - 22, 18, { alpha: 0.6, max: W - 40 });
   }
 
   // ---- the menu ----
