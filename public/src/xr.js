@@ -217,9 +217,12 @@ export class VoidXR {
   // ahead (an eye's picture is off its middle). Not in a headset's own browser (Android): no screen to see it there.
   // Only where the headset's picture is one layer (WebXR's layers, the projection layer, not read from here).
   mirror() {
-    const layer = this.session?.renderState.baseLayer, eye = this.renderer.xr.getCamera().cameras[0];
-    const canvas = this.renderer.domElement, aspect = canvas.clientWidth / canvas.clientHeight;
-    if (MIRRORLESS || !layer || !eye?.viewport || !(aspect > 0)) return;
+    // (nothing to mirror onto first, before the page's size is asked for: asking makes the browser lay the page out,
+    // every frame, a tenth of a millisecond of a Quest 2's at least)
+    const layer = this.session?.renderState.baseLayer;
+    if (MIRRORLESS || !layer) return;
+    const eye = this.renderer.xr.getCamera().cameras[0], canvas = this.renderer.domElement, aspect = canvas.clientWidth / canvas.clientHeight;
+    if (!eye?.viewport || !(aspect > 0)) return;
     const gl = this.renderer.getContext(), vp = eye.viewport, P = eye.projectionMatrix.elements;
     // (straight ahead, in the eye's picture: where its projection puts the point on its axis)
     const ax = vp.x + ((1 - P[8]) / 2) * vp.z, ay = vp.y + ((1 - P[9]) / 2) * vp.w;
@@ -307,7 +310,7 @@ export class VoidXR {
 // the frame, before it asks where in the picture each is drawn (the headset gives a smaller part then). Put
 // in once, the first time the headset is put on.
 const VIEW_SCALE = typeof XRView !== "undefined" && "requestViewportScale" in XRView.prototype;
-const MIRRORLESS = /Android/i.test(navigator.userAgent); // (see mirror)
+const MIRRORLESS = /Android/i.test(navigator.userAgent) || standalone(); // (see mirror: a Quest's browser does not say Android)
 let viewScale = 1, viewScaled = 1;
 function scaleViews() {
   if (!VIEW_SCALE || scaleViews.done) return;
