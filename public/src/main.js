@@ -50,6 +50,15 @@ renderer.toneMappingExposure = 1.0;
 // pass alone: reset once a frame, in frame, the last whole frame's kept in lastDrawn)
 renderer.info.autoReset = false;
 const lastDrawn = { calls: 0, triangles: 0 };
+// An instanced mesh with no instances draws nothing, but three.js sets its program, its uniforms and its buffers for
+// it all the same, for each eye: on a Quest 2 that is work for the browser's GPU side in the frame's own time (a
+// dense song's notes, walls, bombs and blood had 17 such a frame, most of the time). Not asked of the card at all.
+// Holds as three.js has it: each draw sets the program and state it needs itself, so none relies on one skipped
+const drawDirect = renderer.renderBufferDirect;
+renderer.renderBufferDirect = function (camera, scene, geometry, material, object, group) {
+  if (object.isInstancedMesh && object.count === 0) return;
+  return drawDirect.call(this, camera, scene, geometry, material, object, group);
+};
 
 const scene = new THREE.Scene();
 // the headset (see xr.js) and what it shows in place of the page's words (vrhud.js): made once the rest is
