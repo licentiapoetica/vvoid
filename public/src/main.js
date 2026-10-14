@@ -1837,7 +1837,7 @@ function frame(now) {
   lastFrameAt = now;
   try {
     frameWork(now);
-    if (xr.session) xr.mirror(); // (the headset's picture on the screen too, once all of it is drawn)
+    if (xr?.session) xr.mirror(); // (the headset's picture on the screen too, once all of it is drawn)
   } finally {
     perfHud.record(now, gap, performance.now() - began);
     if (perfHud.shown) perfHud.update(now, { drawn: lastDrawn, extra: metricsLines() });
