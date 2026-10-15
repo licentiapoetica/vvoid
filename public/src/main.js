@@ -1360,7 +1360,7 @@ function stopFlying() {
 // way out (a plugin's exit hook: { at, label, hole? }, or several, while you are in its dimension)
 // (what each is called, under the crosshair while it is on one: see showPortalName)
 const PORTAL_HOLES = { zone: 112, pt: 220 }; // (how wide a ring's dark sphere is, where it is not the usual)
-const PORTAL_NAMES = { f0ck: "f0ck", z0r: "z0r", gumo: "gumo", somafm: "somafm", player: "the player", files: "your files", zone: "the zone", chan: "4chan", shorts: "youtube shorts", tiktok: "tiktok", redgifs: "redgifs", marderchen: "marderchen", discord: "discord", watch: "watch together", bhop: "bhop", mania: "mania", saber: "saber", edge: "the edge", pt: "p.t." };
+const PORTAL_NAMES = { f0ck: "f0ck", z0r: "z0r", gumo: "gumo", somafm: "somafm", player: "the player", files: "your files", zone: "the zone", chan: "4chan", shorts: "youtube shorts", tiktok: "tiktok", redgifs: "redgifs", efukt: "efukt", marderchen: "marderchen", discord: "discord", watch: "watch together", bhop: "bhop", mania: "mania", saber: "saber", edge: "the edge", pt: "p.t." };
 function portalAimedAt() {
   // (each with the size of its dark sphere: the crosshair on that, and nowhere round it; the way back
   // floating beside you, wherever you are)
@@ -1409,7 +1409,7 @@ function flyIntoPortal(portal, fast = false) {
 // The Tab panel inside a dimension: its own window and the general ones (the map's, the keys, graphics,
 // the controller), not every other dimension's too; in the hub, where you choose where to go, all of them.
 // A plugin's window is known by its id (<name>Panel, or one named here) and the dimension it belongs to.
-const PANEL_REALMS = { f0ckPanel: "f0ck", chanPanel: "chan", tiktokPanel: "tiktok", redgifsPanel: "redgifs", shortsPanel: "shorts", z0rPanel: "z0r", somaPanel: "somafm", filesPanel: "files" };
+const PANEL_REALMS = { f0ckPanel: "f0ck", chanPanel: "chan", tiktokPanel: "tiktok", redgifsPanel: "redgifs", efuktPanel: "efukt", shortsPanel: "shorts", z0rPanel: "z0r", somaPanel: "somafm", filesPanel: "files" };
 // whose each plugin's window is: one behind a password (see locks.js) shows only inside its own
 // dimensions, never in the hub (its settings are had in it, past its password)
 const PANEL_PLUGINS = { ...PANEL_REALMS, playerPanel: "player", bhopPanel: "bhop", edgePanel: "edge" };

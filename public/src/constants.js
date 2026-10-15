@@ -26,7 +26,7 @@ export const PORTAL_FORMS_ITSELF = new Set(["pt"]);
 // always evenly kept, however many there are. hubSlot(name): where that one stands. Unless an admin has
 // placed it (VVOID_<NAME>_PORTAL, see server.js: { angle in degrees, ring, height }): there, the others
 // standing where they would have stood all the same.
-export const PORTAL_ORDER = ["f0ck", "z0r", "gumo", "somafm", "player", "files", "marderchen", "chan", "shorts", "tiktok", "redgifs", "discord", "watch", "zone", "bhop", "mania", "saber", "edge", "pt"];
+export const PORTAL_ORDER = ["f0ck", "z0r", "gumo", "somafm", "player", "files", "marderchen", "chan", "shorts", "tiktok", "redgifs", "efukt", "discord", "watch", "zone", "bhop", "mania", "saber", "edge", "pt"];
 let portals = PORTAL_ORDER, placed = {};
 export function setPortals(plugins, places = {}) {
   portals = PORTAL_ORDER.filter((name) => plugins.includes(name));
