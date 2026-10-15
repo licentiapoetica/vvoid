@@ -64,20 +64,22 @@ export class TouchButtons {
   }
 
   // A plugin's own buttons, in a group of their own (added once), a layer of their own when arranged
-  // (named title): [id, label, where it begins: [side, from it, from the bottom], across (pixels, at
-  // first)], side being left, right or center (from the middle, to the right). Or, with row: [side, x,
-  // from the bottom], they are a row, side by side (gap pixels between them), moved as one and never
-  // hidden one by one: each needs no place of its own. here(): it is arranged now (in its own dimension);
-  // on(): it is shown and pressed now; press(id, down, t): t the moment it was, on the page's clock
-  // (performance.now). A thumb on one does not turn the view, unless look is true. fit(): where what it
-  // stands for is drawn on the screen now, { x, y, across, gap } in pixels (a row's middle, each one's
-  // width, between them), for "fit" when arranging; null when it cannot say.
-  add(group, list, { title = group, here = () => true, on = () => true, press, look = false, row = null, gap = 8, fit = null } = {}) {
+  // (named title): [id, label, where it begins: [side, from it, from the bottom (or the top: [side, x, y,
+  // "top"])], across (pixels, at first)], side being left, right or center (from the middle, to the right).
+  // Or, with row: [side, x, from the bottom], they are a row, side by side (gap pixels between them), moved
+  // as one and never hidden one by one: each needs no place of its own. here(): it is arranged now (in its
+  // own dimension); on(): it is shown and pressed now; has(id): that one of them is there now (each, unless
+  // it says); press(id, down, t): t the moment it was, on the page's clock (performance.now). A thumb on one
+  // does not turn the view, unless look is true. fit(): where what it stands for is drawn on the screen now,
+  // { x, y, across, gap } in pixels (a row's middle, each one's width, between them), for "fit" when
+  // arranging; null when it cannot say. alone(): while it says so, vvoid's own are not shown (a song
+  // watched: nothing to fly)
+  add(group, list, { title = group, here = () => true, on = () => true, has = () => true, press, look = false, row = null, gap = 8, fit = null, alone = null } = {}) {
     if (this.groups[group]) return;
-    this.groups[group] = { title, here, on, press, look, fit, row: row && { at: { h: row[0], x: row[1], v: "bottom", y: row[2] }, gap, list: [] } };
+    this.groups[group] = { title, here, on, has, press, look, fit, alone, row: row && { at: { h: row[0], x: row[1], v: "bottom", y: row[2] }, gap, list: [] } };
     if (row) this.at[group] = valid(this.saved.at?.[group]) ?? { ...this.groups[group].row.at };
     for (const [id, label, at, across = 58] of list) {
-      const [h, x, y] = at ?? row, b = { id: `${group}:${id}`, own: id, group, label, afoot: label, at: { h, x, v: "bottom", y }, shown: true, across };
+      const [h, x, y, v = "bottom"] = at ?? row, b = { id: `${group}:${id}`, own: id, group, label, afoot: label, at: { h, x, v, y }, shown: true, across };
       this.make(b);
       this.groups[group].row?.list.push(b);
     }
@@ -131,8 +133,9 @@ export class TouchButtons {
     return [(first.left + last.right) / 2, (first.top + first.bottom) / 2];
   }
 
-  // Each frame (and as they change): which are shown. Its group on now (vvoid's own out of a seat, mania's
-  // while a song plays), and not hidden; arranging, every one of the groups here, the hidden ones faintly.
+  // Each frame (and as they change): which are shown. Its group on now (vvoid's own out of a seat, and while
+  // no plugin's wants the screen alone; mania's while a song plays), it there now, and not hidden; arranging,
+  // every one of the groups here, the hidden ones faintly.
   // On foot (bhop, the edge) the stick walks and the buttons jump and duck; flying, it flies, they rise and sink.
   update({ afoot = this.onFoot, seated = this.seated } = {}) {
     this.seated = seated;
@@ -140,9 +143,10 @@ export class TouchButtons {
       this.onFoot = afoot;
       for (const b of this.list) b.el.querySelector("span").textContent = afoot ? b.afoot : b.label;
     }
+    const alone = Object.values(this.groups).some((g) => g.alone?.());
     for (const b of this.list) {
       const group = this.groups[b.group], faint = !group.row && this.hidden.has(b.id); // (a row is never hidden one by one)
-      const out = this.arranging ? b.group !== this.layer : faint || !group.on();
+      const out = this.arranging ? b.group !== this.layer : faint || !group.on() || (b.group === "vvoid" && alone) || (b.own !== undefined && !group.has(b.own));
       if (b.el.hidden !== out) b.el.hidden = out;
       b.el.classList.toggle("faint", faint);
     }

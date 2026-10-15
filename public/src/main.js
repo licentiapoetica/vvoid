@@ -335,7 +335,8 @@ const back = new Back({ scene, world, textEl: $("irrlicht"), toOrigin: stored("i
 // hold(): a reason, while it keeps you where you are (no portal, no way back, no jump by the map) ·
 // seat(): { at, title, keys, pad } while it holds you in a seat (at: where; the view still turns; its keys
 // stay on the screen) · level(): true when R turned you its own way · quiet(): true while the entity
-// keeps away · and, asked of every plugin: keyUp(e), pointer(locked) (the pointer taken or let go),
+// keeps away · menu(): true when it took a touch screen's menu button (a song paused by it, not played on
+// behind the Tab panel) · and, asked of every plugin: keyUp(e), pointer(locked) (the pointer taken or let go),
 // jump() (you are put somewhere at once, by the map or the way back), gamepad(gp, pad) (the controller
 // each frame, seated or not) · draw(renderer, dt): true when it drew the frame itself (a headset's picture),
 // vvoid's own drawing left out · posting() / post(renderer, write, read): a pass of its own over the picture
@@ -943,6 +944,7 @@ function start() {
 }
 // the Tab panel, on a touch screen: its button opens it and closes it again
 $("menuButton").addEventListener("click", () => {
+  if (!map.open && hook("menu")) return;
   map.toggle();
   $("menuButton").textContent = map.open ? "close" : "menu";
 });
@@ -2039,7 +2041,8 @@ const game = {
   helpMode: () => helpMode,                 // "keys" or "pad": whichever was used last
   pad: padMap, // the controller's buttons, as mapped (see pad.js): a plugin may add actions of its own
   // a touch screen's buttons: a plugin may add its own, and have them arranged from its own window (see touch.js)
-  touch: { add: (group, list, how) => touchButtons.add(group, list, how), arrange: (layer) => touchButtons.arrange(true, layer) },
+  // (arranging(): they are being arranged now; look(dx, dy): the view turned as a finger on the picture turns it)
+  touch: { add: (group, list, how) => touchButtons.add(group, list, how), arrange: (layer) => touchButtons.arrange(true, layer), arranging: () => touchButtons.arranging, look: (dx, dy) => touchButtons.look(dx, dy) },
   arrive, face, note, lockPointer, levelOut, touching: () => pointerType === "touch", // (a finger the last to press: no pointer to lock)
   showHelp: () => showHelp(),
   setVolume: (v) => setVolume(v), volume: () => audio.volume, // vvoid's own volume (its sliders kept in step)
