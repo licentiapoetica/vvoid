@@ -443,7 +443,9 @@ showFov();
 function showRaw() {
   $("gRaw").textContent = rawInput === null ? "raw input: known once the pointer is taken"
     : rawInput ? "raw input: yes (the mouse as it moves, no acceleration)"
-    : "raw input: not in this browser, so the system's pointer acceleration applies (turn it off there for an even feel, and lower the smoothing)";
+    : /firefox/i.test(navigator.userAgent) && /linux/i.test(navigator.userAgent)
+      ? "raw input: not in this browser, and Firefox on Linux drops what is less than a whole pixel of each move: keep the system's pointer speed at its middle (0, flat), or slow moves are lost; turn the look down here instead"
+      : "raw input: not in this browser, so the system's pointer acceleration applies (turn it off there for an even feel, and lower the smoothing)";
 }
 showSensitivity();
 showRaw();
@@ -993,7 +995,20 @@ const moved = (e, axis) => {
   const sum = each.length > 1 ? each.reduce((total, c) => total + c[axis], 0) : own;
   return Math.abs(sum) > Math.abs(own) ? sum : own;
 };
-document.addEventListener("pointermove", (e) => {
+// Firefox gives the mouse's movement in CSS pixels, so its page zoom (and the screen's scale) shrinks it:
+// at 133% the view turned a quarter less for the same push than in Chromium. Scaled back to the
+// mouse's own pixels here. (Chromium's movement is not zoomed, so it is left as it is.)
+const zoomedMovement = /firefox/i.test(navigator.userAgent);
+let mouseScale = 1;
+const keepMouseScale = () => { mouseScale = zoomedMovement ? devicePixelRatio : 1; };
+keepMouseScale();
+addEventListener("resize", keepMouseScale); // (the zoom changed: Ctrl + / -)
+// The mouse's moves are gathered as they come and turn the view once a frame, at its start (see frameWork),
+// all of what came since the last. They are taken from pointerrawupdate where there is one: every report
+// of the mouse, the moment it comes, so a frame has all of them up to its start (pointermove comes once a
+// frame, folded). (pointerrawupdate only in a secure page: else pointermove, as before.)
+let lookX = 0, lookY = 0;
+document.addEventListener("onpointerrawupdate" in window ? "pointerrawupdate" : "pointermove", (e) => {
   if (document.pointerLockElement !== canvas || e.pointerType !== "mouse") return;
   // a button pressed or let go while another is held (left clicked with the right held to zoom) comes as a
   // move, not a press (its button set: a real move's is -1), and its movement is not the mouse's: it threw the view
@@ -1002,8 +1017,15 @@ document.addEventListener("pointermove", (e) => {
   if (skipMoves > 0) return void skipMoves--;
   const dx = moved(e, "movementX"), dy = moved(e, "movementY");
   if (Math.abs(dx) > 400 || Math.abs(dy) > 400) return;
-  look(dx, dy, MOUSE_LOOK * sensitivity * (camera.fov / baseFov())); // zoomed in, the view turns as much less
+  lookX += dx * mouseScale;
+  lookY += dy * mouseScale;
 });
+function mouseLook() {
+  if (!lookX && !lookY) return;
+  look(lookX, lookY, MOUSE_LOOK * sensitivity * (camera.fov / baseFov())); // zoomed in, the view turns as much less
+  lookX = lookY = 0;
+}
+document.addEventListener("pointerlockchange", () => { lookX = lookY = 0; });
 window.addEventListener("keydown", (e) => {
   // Ctrl is down (descending) while flying: Ctrl+D, Ctrl+S, Ctrl+A... are the game's keys, not the
   // browser's bookmark, save and select (Ctrl+W it won't give up, see below; the text fields stop their own keys)
@@ -1861,6 +1883,7 @@ function frameWork(now) {
   if (meter.time >= 0.5) { meter.fps = meter.frames / meter.time; meter.frames = 0; meter.time = 0; if (map.open) showNow(); }
   elapsed += dt;
   if (xr?.on) xr.update();
+  mouseLook();
   pollPad(dt);
   if (xr?.on) walked();
   if (keys.size || rightHeld) stir(); // (a key held, flying, is not being still)
