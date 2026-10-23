@@ -1,12 +1,12 @@
 // A touch screen's own buttons, for what keys do: a stick to walk (or fly) with, jump, duck, use, let
-// go, the laser, and back to the checkpoint; and whatever a plugin adds (see add: mania's four lanes, a
+// go, the laser, and back to the checkpoint; and whatever a plugin adds (see add: a game's lanes, a
 // row of them moved as one). Each is where the player put it (the menu's "buttons", beside close: then
 // drag each, tap one to show or hide it, and size them as you like, a row's gap and height too, or fit
-// them to what a plugin draws, mania's lanes over its receptors; one layer at a time, vvoid's own flying
+// them to what a plugin draws, its lanes over what they stand for; one layer at a time, vvoid's own flying
 // and a plugin's, so neither hides the other under it), kept by the edge it is nearest, so a phone turned
 // keeps them by your thumbs; which are hidden, and how large, remembered too. What a press of vvoid's own
 // does is main.js's: this only says which was pressed (press), where the stick is (stick), and how a
-// thumb on a button turned the view (look: a thumb holding jump still aims, as bhop asks).
+// thumb on a button turned the view (look: a thumb holding jump still aims, as a plugin may ask).
 
 // vvoid's own: [id, its name flying, its name on foot (if another), where it begins: [side, from it, from the bottom], shown at first]
 const OWN = [
@@ -73,13 +73,13 @@ export class TouchButtons {
   // does not turn the view, unless look is true. fit(): where what it stands for is drawn on the screen now,
   // { x, y, across, gap } in pixels (a row's middle, each one's width, between them), for "fit" when
   // arranging; null when it cannot say. alone(): while it says so, vvoid's own are not shown (a song
-  // watched: nothing to fly)
-  add(group, list, { title = group, here = () => true, on = () => true, has = () => true, press, look = false, row = null, gap = 8, fit = null, alone = null } = {}) {
+  // watched: nothing to fly). glyph: their labels are signs, not words (arrows): drawn larger
+  add(group, list, { title = group, here = () => true, on = () => true, has = () => true, press, look = false, row = null, gap = 8, fit = null, alone = null, glyph = false } = {}) {
     if (this.groups[group]) return;
     this.groups[group] = { title, here, on, has, press, look, fit, alone, row: row && { at: { h: row[0], x: row[1], v: "bottom", y: row[2] }, gap, list: [] } };
     if (row) this.at[group] = valid(this.saved.at?.[group]) ?? { ...this.groups[group].row.at };
     for (const [id, label, at, across = 58] of list) {
-      const [h, x, y, v = "bottom"] = at ?? row, b = { id: `${group}:${id}`, own: id, group, label, afoot: label, at: { h, x, v, y }, shown: true, across };
+      const [h, x, y, v = "bottom"] = at ?? row, b = { id: `${group}:${id}`, own: id, group, label, afoot: label, at: { h, x, v, y }, shown: true, across, glyph };
       this.make(b);
       this.groups[group].row?.list.push(b);
     }
@@ -89,6 +89,7 @@ export class TouchButtons {
   make(b) {
     const el = Object.assign(document.createElement("div"), { className: b.id === "walk" ? "stick" : "button", hidden: true });
     el.dataset.id = b.id;
+    if (b.glyph) el.classList.add("glyph"); // (its label a sign, not a word: drawn larger)
     el.append(Object.assign(document.createElement("span"), { textContent: b.label }));
     if (b.id === "walk") el.prepend((this.knob = Object.assign(document.createElement("i"), { className: "knob" })));
     b.el = el;
@@ -134,9 +135,9 @@ export class TouchButtons {
   }
 
   // Each frame (and as they change): which are shown. Its group on now (vvoid's own out of a seat, and while
-  // no plugin's wants the screen alone; mania's while a song plays), it there now, and not hidden; arranging,
+  // no plugin's wants the screen alone; a plugin's while it says), it there now, and not hidden; arranging,
   // every one of the groups here, the hidden ones faintly.
-  // On foot (bhop, the edge) the stick walks and the buttons jump and duck; flying, it flies, they rise and sink.
+  // On foot (in a plugin's dimension that puts you on foot) the stick walks and the buttons jump and duck; flying, it flies, they rise and sink.
   update({ afoot = this.onFoot, seated = this.seated } = {}) {
     this.seated = seated;
     if (afoot !== this.onFoot) {
@@ -177,7 +178,7 @@ export class TouchButtons {
       ...(fit ? [fit] : []));
   }
 
-  // a row over what it stands for (mania's lanes over its receptors): as wide, as far apart, its middle there
+  // a row over what it stands for (a game's lanes over what they stand for): as wide, as far apart, its middle there
   fit() {
     const group = this.groups[this.layer], to = group.fit?.(), first = group.row?.list[0];
     if (!to || !first) return;

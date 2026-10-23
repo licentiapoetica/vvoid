@@ -1,7 +1,7 @@
 // Lasers: a beam of light from just under your sight to what you shot at (a portal clicked, or V: just
 // ahead, into the dark), its tip racing out, light running along it, held while you fly where it points
-// and then faded. The same beam as the f0ck plugin's at its posts. Anyone else's (see the together
-// plugin) is drawn here too, in their colour, from where they are.
+// and then faded. The same beam as a plugin's may be at its posts. Anyone else's (a plugin's that
+// brings others in) is drawn here too, in their colour, from where they are.
 //
 // Every shot of your own is told to whoever listens (onShot), as two points: where from, where to.
 import * as THREE from "three";
@@ -53,7 +53,7 @@ export class Lasers {
     return beam;
   }
 
-  // a shot of yours drawn by something else (the f0ck plugin draws its own at its posts), only told
+  // a shot of yours drawn by something else (a plugin drawing its own at its posts), only told
   told(from, to) {
     for (const listen of this.listeners) listen(from.clone(), to.clone());
   }

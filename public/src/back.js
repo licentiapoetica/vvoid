@@ -22,7 +22,7 @@
 // while to look at something (a portal, a way out, or only off into the dark) and back; annoyed, half lidded, looking sideways at you and rolling its eyes,
 // the longer the more often, when where you are takes a long while to materialize.
 //
-// While music plays (the player, a radio station, a song in mania: see audio.music), what breaks off its
+// While music plays (a song, a radio station: see audio.music), what breaks off its
 // edge is music notes instead of embers, rising and swaying, more of them on the beat. Stopped, they
 // stop (embers again); played again, they come back a moment after.
 //
@@ -186,12 +186,12 @@ export class Back {
     this.closer = 0;  // how fast you near it, its own drifting taken out (eased)
     this.fade = 0;    // the dark as you go in (main.js draws it)
     this.home = new THREE.Vector3();     // where it would float (eased towards you)
-    this.post = null;                    // a place it waits at instead, not following you (a plugin's, set each frame: bhop's stage)
-    this.terrified = false;              // a plugin's say, set each frame: it is afraid (p.t.'s house), its eyes wide and darting; 2, frantic
-    this.joy = false;                    // a plugin's say, set each frame: it is overjoyed (saber's, on the platform as a song is filmed), its eyes two happy arches
-    this.chill = false;                  // a plugin's say, set each frame: it is at its ease where it is (saber's, in a corner of the platform as a song is played or watched)
+    this.post = null;                    // a place it waits at instead, not following you (a plugin's, set each frame: a stage of its own)
+    this.terrified = false;              // a plugin's say, set each frame: it is afraid (a haunted house), its eyes wide and darting; 2, frantic
+    this.joy = false;                    // a plugin's say, set each frame: it is overjoyed (on a plugin's platform as a song is filmed), its eyes two happy arches
+    this.chill = false;                  // a plugin's say, set each frame: it is at its ease where it is (in a corner of a plugin's platform as a song is played or watched)
     this.sees = null;                    // a plugin's say, set each frame: what it watches there, chilling (points in the world, the first the most)
-    this.pin = null;                     // a plugin's: exactly where it is this frame (it does not travel there: p.t.'s, at the side of your view, never through a wall)
+    this.pin = null;                     // a plugin's: exactly where it is this frame (it does not travel there: at the side of your view, never through a wall)
     this.size = 1;                       // a plugin's: how big it is (and its smoke, its embers, the dark you click), set each frame
     this.speed = new THREE.Vector3();    // and how it is going, beside you (see place)
     this.keen = 1.7;
@@ -261,7 +261,7 @@ export class Back {
     scene.add(this.notes);
   }
 
-  // where you are: the dimension, and the room of the viewer that dimension is (see the f0ck plugin)
+  // where you are: the dimension, and the room of the viewer that dimension is (a plugin's viewers)
   where() {
     const realm = this.world.realm, viewer = (window.vvoid?.viewers ?? []).find((v) => v.realm === realm) ?? null, room = viewer?.room ?? null;
     return { key: `${realm}|${room?.key ?? ""}`, realm, viewer, room };
@@ -391,7 +391,7 @@ export class Back {
       // a tour flying you (a plugin's: see main.js), it is not being come to, only passed: it does not wait
       // for the view the tour turns over it, keeps out of the tour's way, and is not gone through
       const touring = this.touring && !this.held;
-      // on foot, in a plugin's dimension that moves you itself (bhop's: afoot, set each frame), it is as
+      // on foot, in a plugin's dimension that moves you itself (afoot, set each frame), it is as
       // ever, but not gone through by running into it: only clicked
       const passable = this.afoot && !this.held;
       // at its post (a plugin's: see post), it goes there and stays, neither following you nor going aside
@@ -513,7 +513,7 @@ export class Back {
     const towardYou = new THREE.Vector2(-ahead2.x, -ahead2.y).normalize().multiplyScalar(0.05);
     let lid = 0.18, wide = 1, smile = 0, look = m.glance, mood = "calm";
     if (this.terrified && !(closing > 0.4 || this.open > 0.3)) {
-      // terrified (a plugin's say: p.t.'s house): its eyes as wide as they go, darting about, back to you,
+      // terrified (a plugin's say: a haunted house): its eyes as wide as they go, darting about, back to you,
       // away again, never still, trembling. Frantic (terrified 2: something is right behind you): flipping
       // between terror and fury, wide and then narrowed to a glare, darting several times as fast, shaking
       const frantic = this.terrified > 1;
@@ -539,7 +539,7 @@ export class Back {
       look = side.set(Math.sin(this.time * 2.3) * 0.03, 0.012 + Math.abs(Math.sin(this.time * 4.1)) * 0.015);
     }
     else if (this.chill) {
-      // chilling (a plugin's say): happy, its eyes two arches, watching what goes on there (sees: saber's, whoever
+      // chilling (a plugin's say): happy, its eyes two arches, watching what goes on there (sees: a plugin's, whoever
       // plays and down the track), its face turned to it and not to you
       mood = "chilling"; lid = 0; wide = 1.1; smile = 1;
       look = this.watchNow(dt) ? side.copy(this.awayTo(camera)) : ZERO;

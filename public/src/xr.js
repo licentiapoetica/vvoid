@@ -7,7 +7,7 @@
 //
 // What the hands hold is read here for everyone, each frame, from the frame itself: the head, each
 // hand's grip (where it holds) and ray (where it points), in the play space's metres (its floor at y 0),
-// their buttons and sticks. A plugin with a headset world of its own (the saber plugin) uses these, and
+// their buttons and sticks. A plugin with a headset world of its own uses these, and
 // draws its own scene with its own camera in its draw hook.
 // Bare hands (hand tracking) stand in for controllers: a hand's grip is its fist, worked out from its joints so
 // that what it holds comes out of it on the thumb's side, tipped forward with the knuckles, as a sword is held;
@@ -87,7 +87,7 @@ export class VoidXR {
       session.end().catch(() => {});
       throw err;
     }
-    // (no foveation unless asked for (saber's MAP FOVEATION, while a Vivify map plays): on a Quest 2 it showed up the
+    // (no foveation unless a plugin asks for it (while a world of its own is drawn): on a Quest 2 it showed up the
     // checker AreaLit drew in the headset, the middle of each eye's picture darker, its edge a rectangle that went
     // wherever you looked)
     xr.setFoveation(0);
@@ -100,7 +100,7 @@ export class VoidXR {
   }
   exit() { this.session?.end().catch(() => {}); }
   // How many frames a second: as fast as the headset offers, up to 90 (a Quest 2 begins at 72), or, while a
-  // plugin asks for more (saber's songs: see its pace.js), up to that; null gives it back. The rates offered
+  // plugin asks for more (while it plays), up to that; null gives it back. The rates offered
   // are the headset's (a Quest 2's 120 only once it is turned on in its own settings).
   rate(most = null) {
     this.wanted = most;
@@ -170,7 +170,7 @@ export class VoidXR {
       // (out of the palm: for a right hand, along x across; for a left, across x along)
       const palm = (h.side === "left" ? BARE.palm.crossVectors(along, across) : BARE.palm.crossVectors(across, along)).normalize();
       // (what it holds: out of the fist on the thumb's side, tipped forward with the knuckles; its own -z)
-      const blade = BARE.blade.copy(across).addScaledVector(along, 0.8).normalize(); // (about 40° forward of straight out of the fist: a sword as held; the saber plugin's tilt turns it further)
+      const blade = BARE.blade.copy(across).addScaledVector(along, 0.8).normalize(); // (about 40° forward of straight out of the fist: a sword as held; a plugin's own tilt may turn it further)
       const up = BARE.up.copy(palm).negate().addScaledVector(blade, palm.dot(blade)).normalize(); // (the back of the hand, square to it)
       const z = BARE.z.copy(blade).negate(), x = BARE.x.crossVectors(up, z).normalize();
       h.grip.quaternion.setFromRotationMatrix(_m.makeBasis(x, up, z));
@@ -271,7 +271,7 @@ export class VoidXR {
   // the view itself is never scaled (three.js's own way scales it, and then whatever a shader measures in
   // the view, a point's size, a fade, comes out so many times off), so the scene is seen in its own units.
   // draw: how it is drawn, given the scene and the camera its eyes are put in (a plugin drawing each eye itself,
-  // through passes of its own: see the saber plugin's Vivify); else as it is, straight into the headset
+  // through passes of its own); else as it is, straight into the headset
   render(scene, { at, turn, scale, near, far, draw = null }) {
     const drawn = draw ?? ((s, c) => this.renderer.render(s, c));
     if (!this.session) {

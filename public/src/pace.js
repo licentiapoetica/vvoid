@@ -1,11 +1,11 @@
-// The headset's frames in the void, kept up with (saber's pace.js, for the void's own picture): a frame that
+// The headset's frames in the void, kept up with (as a plugin may keep its own, for the void's own picture): a frame that
 // comes late is a frame missed, felt as a judder. While they come late, each eye's picture is drawn smaller
 // (see xr.js's viewScale), a step at a time; at its smallest the void is seen less far (its far plane nearer,
 // and the sectors past it left undrawn: see world.js's boundBySector); and still late, the headset is asked for
 // a step fewer frames (90 to 72 on a Quest 2), until it is taken off. Grown back slowly once they come on time
 // again (the reach first, then the picture), more slowly each time it had to give way. With the menu up the
 // picture is drawn whole (the headset draws all of a frame at one size, the menu's words too) and nothing is
-// judged; and while a plugin draws the picture itself (saber's own pace keeps it), none of this is the void's.
+// judged; and while a plugin draws the picture itself (its own pace keeps it), none of this is the void's.
 const LATE = 1.4;        // a frame this many times as long as it should be is late (a missed one: twice)
 const OFTEN = 0.08;      // a second with more of its frames late than this is a bad one
 const BAD = 2;           // bad seconds in a row before it gives way (a hitch alone, a sector being built, is not)
@@ -86,7 +86,7 @@ export class HeadsetPace {
     this.grew = grew === true;
     this.settle = SETTLE;
   }
-  // the picture given over to a plugin drawing it itself (saber: its own pace), or the headset taken off: whole
+  // the picture given over to a plugin drawing it itself (its own pace), or the headset taken off: whole
   // again, and the frames as the void asks for them, until the void draws it again (its own kept till then)
   release() {
     if (!this.mine) return;

@@ -1,7 +1,7 @@
 // The numbers of how it runs, over the picture (F4, remembered): how many frames a second and how even they are,
 // how long vvoid's own work takes in a frame, what is drawn (calls, triangles) and kept (programs, geometries,
-// textures, memory), the picture's size, the graphics card; and each plugin's own lines (its metrics hook: the saber
-// plugin's song, its map's world). For finding what is wrong, not for the look: plain, small, in a corner.
+// textures, memory), the picture's size, the graphics card; and each plugin's own lines (its metrics hook: a song
+// it plays, its own world). For finding what is wrong, not for the look: plain, small, in a corner.
 import * as THREE from "three";
 
 const WINDOW = 2; // seconds of frames the frame numbers are taken over

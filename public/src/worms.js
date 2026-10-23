@@ -1,7 +1,7 @@
 // Light worms: a few small lights that wander the dark round you on long, slow curves, each drawing a
 // soft trail behind it that thins and fades, and each blinking now and then like a firefly. Part of the
 // void's look (and of a dimension's that asks for it: see World.enter); while a light show lights the
-// blocks in the sky (saber's), each answers one of its five groups of lights, in its colour, brighter
+// blocks in the sky (a plugin's), each answers one of its five groups of lights, in its colour, brighter
 // and a little quicker as it flares.
 // How many, how fast, how long their trails and the rest: look.worm* (see look.js), an admin's to turn.
 import * as THREE from "three";

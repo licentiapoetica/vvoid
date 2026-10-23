@@ -60,7 +60,7 @@ export class Locks {
   }
   // what the plugin does when its session is let go (its own state of being in, dropped)
   onLeave(name, fn) { this.leaving.set(name, fn); }
-  // what keeps its session as you leave its dimensions (something of it taken along: discord's call);
+  // what keeps its session as you leave its dimensions (something of it taken along: a call);
   // once that is over, out of them still, the plugin calls left(name) itself (and so too after a reload
   // that kept it, once what kept it has not come back)
   keep(name, fn) { this.keeping.set(name, fn); }

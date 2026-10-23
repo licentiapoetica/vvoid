@@ -1,13 +1,10 @@
 // The void's look, as numbers an admin may turn (the Tab panel's look page: see lookPanel in main.js),
 // kept by the server for everyone (GET /api/look; PUT, an admin's: see server.js). Each is read where it
 // is used: by the shaders (all of them in one uniform, uLook, each by its LOOK_ name: see LOOK_GLSL),
-// and by the light worms, the sky and saber, every frame, so a change is seen at once.
+// and by the light worms, the sky and the plugins, every frame, so a change is seen at once. A plugin may
+// bring knobs of its own (looks, in its plugin.json: see manifest.js), added with addLooks before the look
+// is read, on the server, in the page and in the panel alike.
 // (Nothing here may import three: the server reads this file too.)
-
-// saber's cinematic shots (see SHOTS in plugins/saber/public/client.js, by the same names), each with a chance of
-// its own on the look page: 0 never, 1 as often as any, 2 twice as often. Numbered, for "only one shot"
-export const CINE_SHOTS = ["low dolly", "orbit", "crane", "facing them", "over the shoulder", "from the floor", "vertigo", "spiral up", "dutch close", "side profile", "sweep", "rising behind", "top down", "far tele", "the void", "first person"];
-export const shotKey = (name) => `shot_${name.replace(/[^a-z0-9]+/g, "_")}`;
 
 export const LOOK = [
   // the pieces that stand in the void (see BOX_FRAG)
@@ -64,103 +61,6 @@ export const LOOK = [
   { key: "wormFar", group: "light worms", label: "furthest", min: 300, max: 8000, step: 10, value: 2200 },
   { key: "wormColour", type: "colour", group: "light worms", label: "colour", value: "#ffffff" },
   { key: "wormColourMix", group: "light worms", label: "colour override", min: 0, max: 1, step: 0.01, value: 0 },
-  // saber's light show, in the void round its stage (see fly in plugins/saber)
-  { key: "saberGain", group: "saber", label: "light show reach", min: 0, max: 4, step: 0.01, value: 1 },
-  { key: "saberFlash", group: "saber", label: "flash", min: 0, max: 3, step: 0.01, value: 0.6 },
-  { key: "saberRest", group: "saber", label: "glow at rest", min: 0, max: 1.5, step: 0.01, value: 0.25 },
-  // saber's cinematic camera, to the beat: how it takes a double, both hands' notes at once (see filmBeat in plugins/saber)
-  { key: "doubleSlam", group: "saber doubles", label: "slam in", min: 0, max: 0.6, step: 0.005, value: 0.16 },
-  { key: "doubleFade", group: "saber doubles", label: "slam fades (speed)", min: 0.5, max: 20, step: 0.1, value: 4.5 },
-  { key: "doubleWindup", group: "saber doubles", label: "draw back before", min: 0, max: 0.3, step: 0.005, value: 0.045 },
-  { key: "doubleLead", group: "saber doubles", label: "seen coming (seconds)", min: 0.1, max: 1.5, step: 0.05, value: 0.5 },
-  { key: "doubleLunge", group: "saber doubles", label: "lunge at them (metres)", min: 0, max: 2, step: 0.01, value: 0.3 },
-  { key: "doubleTip", group: "saber doubles", label: "horizon kick", min: 0, max: 0.4, step: 0.005, value: 0.07 },
-  { key: "doubleEyes", group: "saber doubles", label: "through their eyes", min: 0, max: 1, step: 0.01, value: 0.5 },
-  { key: "doubleCalm", group: "saber doubles", label: "in calm parts", min: 0, max: 1, step: 0.01, value: 0.5 },
-  // saber's cinematic camera, to the beat (see filmBeat in plugins/saber): how long a shot holds, how often it is
-  // through their eyes, and how it swoops from one to the next
-  { key: "camHuman", type: "switch", group: "saber camera", label: "a human holds the camera", min: 0, max: 1, step: 1, value: 0 },
-  { key: "camHumanHow", group: "saber camera", label: "how human: their hands, their following", min: 0.1, max: 2, step: 0.05, value: 1 },
-  { key: "camHoldBusy", group: "saber camera", label: "bars a shot holds: many notes", min: 1, max: 16, step: 1, value: 2 },
-  { key: "camHoldNormal", group: "saber camera", label: "bars a shot holds: most of a song", min: 1, max: 16, step: 1, value: 4 },
-  { key: "camHoldQuiet", group: "saber camera", label: "bars a shot holds: quiet", min: 1, max: 32, step: 1, value: 8 },
-  { key: "camFit", group: "saber camera", label: "shots chosen for what comes (0 any, 1 only fitting)", min: 0, max: 1, step: 0.01, value: 1 },
-  { key: "camRepeat", group: "saber camera", label: "not again within (shots)", min: 0, max: 8, step: 1, value: 4 },
-  { key: "camEyesBusy", group: "saber camera", label: "first person chance: many notes", min: 0, max: 1, step: 0.01, value: 0.6 },
-  { key: "camEyesArcs", group: "saber camera", label: "first person chance: arcs", min: 0, max: 1, step: 0.01, value: 0.35 },
-  { key: "camEyesWalls", group: "saber camera", label: "first person chance: walls", min: 0, max: 1, step: 0.01, value: 0.3 },
-  { key: "camEyesNormal", group: "saber camera", label: "first person chance: most of a song", min: 0, max: 1, step: 0.01, value: 0.3 },
-  { key: "camEyesQuiet", group: "saber camera", label: "first person chance: quiet", min: 0, max: 1, step: 0.01, value: 0.1 },
-  { key: "camSwoop", group: "saber camera", label: "swoop length (seconds)", min: 0.3, max: 4, step: 0.05, value: 1.1 },
-  { key: "camSwoopCalm", group: "saber camera", label: "swoop length, calm (seconds)", min: 0.3, max: 6, step: 0.05, value: 2.4 },
-  { key: "camBank", group: "saber camera", label: "swoop banks into the turn", min: 0, max: 1, step: 0.01, value: 0.3 },
-  { key: "camPull", group: "saber camera", label: "swoop pulls wide", min: 0, max: 0.6, step: 0.01, value: 0.25 },
-  { key: "camLift", group: "saber camera", label: "swoop arcs over", min: 0, max: 0.6, step: 0.01, value: 0.18 },
-  { key: "camLand", group: "saber camera", label: "swoop lands with a punch", min: 0, max: 0.5, step: 0.01, value: 0.14 },
-  { key: "camEarly", group: "saber camera", label: "big light show moments swoop early (chance)", min: 0, max: 1, step: 0.01, value: 0.5 },
-  { key: "camSolo", group: "saber shots", label: "only one shot, to judge it (its number; 0 all)", min: 0, max: CINE_SHOTS.length, step: 1, value: 0 },
-  ...CINE_SHOTS.map((name, i) => ({ key: shotKey(name), group: "saber shots", label: `${i + 1} · ${name}`, min: 0, max: 5, step: 0.05, value: 1 })),
-  // saber's avatar, twerking with the song (see shake in plugins/saber/public/avatar.js): how deep, how big each
-  // pop, how loose its springs (the jiggle), how hard the notes, the doubles and the light show kick it, how it moves about
-  { key: "twerkSquat", group: "saber twerk", label: "squat (metres down)", min: 0, max: 0.2, step: 0.005, value: 0.1 },
-  { key: "twerkBack", group: "saber twerk", label: "hips back (metres)", min: 0, max: 0.2, step: 0.005, value: 0.11 },
-  { key: "twerkBounce", group: "saber twerk", label: "bounce each pop (metres)", min: 0, max: 0.15, step: 0.005, value: 0.06 },
-  { key: "twerkThrow", group: "saber twerk", label: "hips thrown back each pop (metres)", min: 0, max: 0.15, step: 0.005, value: 0.05 },
-  { key: "twerkSnap", group: "saber twerk", label: "how sharp each pop (lower: snappier)", min: 0.05, max: 0.5, step: 0.01, value: 0.13 },
-  { key: "twerkWide", group: "saber twerk", label: "feet apart (x)", min: 1, max: 2.5, step: 0.05, value: 1.8 },
-  { key: "twerkTip", group: "saber twerk", label: "pelvis tipped, always (degrees)", min: 0, max: 30, step: 0.5, value: 14 },
-  { key: "twerkPop", group: "saber twerk", label: "pop (degrees)", min: 0, max: 50, step: 0.5, value: 30 },
-  { key: "twerkCalm", group: "saber twerk", label: "how big, calm", min: 0, max: 2, step: 0.01, value: 0.7 },
-  { key: "twerkLively", group: "saber twerk", label: "how big, lively", min: 0, max: 2, step: 0.01, value: 1.05 },
-  { key: "twerkHard", group: "saber twerk", label: "hard twerk in a drop: bigger by (x)", min: 0, max: 2, step: 0.05, value: 0.5 },
-  { key: "twerkHardAt", group: "saber twerk", label: "a drop: the song this much busier than usual (x)", min: 1.1, max: 4, step: 0.05, value: 1.6 },
-  { key: "twerkFastest", group: "saber twerk", label: "pops a second, at most", min: 0.5, max: 5, step: 0.05, value: 2.4 },
-  { key: "twerkFastestHard", group: "saber twerk", label: "pops a second at most, hard twerk", min: 0.5, max: 6, step: 0.05, value: 3.4 },
-  { key: "twerkHalf", group: "saber twerk", label: "once every two beats below (bpm)", min: 30, max: 120, step: 1, value: 60 },
-  { key: "twerkMost", group: "saber twerk", label: "pelvis tipped at most (degrees)", min: 10, max: 90, step: 1, value: 55 },
-  { key: "twerkSpring", group: "saber twerk", label: "jiggle speed (Hz)", min: 1, max: 12, step: 0.1, value: 4.6 },
-  { key: "twerkJiggle", group: "saber twerk", label: "jiggle damping (lower: jigglier)", min: 0.03, max: 1, step: 0.01, value: 0.15 },
-  { key: "twerkFlick", group: "saber twerk", label: "flick to the side each pop (degrees)", min: 0, max: 20, step: 0.5, value: 7 },
-  { key: "twerkNudge", group: "saber twerk", label: "lean towards the notes' side (degrees)", min: 0, max: 15, step: 0.5, value: 4 },
-  { key: "twerkSlam", group: "saber twerk", label: "slam on both hands at once, in a drop", min: 0, max: 20, step: 0.1, value: 9 },
-  { key: "twerkBig", group: "saber twerk", label: "pop on the light show's big moments", min: 0, max: 20, step: 0.1, value: 6 },
-  { key: "twerkSway", group: "saber twerk", label: "sway over a bar (degrees)", min: 0, max: 20, step: 0.5, value: 8 },
-  { key: "twerkShimmy", group: "saber twerk", label: "shimmy in a stream (degrees)", min: 0, max: 12, step: 0.25, value: 5 },
-  { key: "twerkWander", group: "saber twerk", label: "moves about (x)", min: 0, max: 3, step: 0.05, value: 1.2 },
-  { key: "twerkTurn", group: "saber twerk", label: "turns about, up to (degrees)", min: 0, max: 45, step: 1, value: 25 },
-  // saber's avatar, vibing to the song (see vibe in plugins/saber/public/avatar.js): its knees giving into each beat, its
-  // weight from foot to foot, the hips and the chest against each other; how smooth its springs, how the song moves it
-  { key: "vibeBounce", group: "saber vibe", label: "knees give each beat (metres)", min: 0, max: 0.12, step: 0.005, value: 0.035 },
-  { key: "vibeSink", group: "saber vibe", label: "knees bent, always (metres)", min: 0, max: 0.12, step: 0.005, value: 0.025 },
-  { key: "vibeShift", group: "saber vibe", label: "weight foot to foot (metres)", min: 0, max: 0.15, step: 0.005, value: 0.045 },
-  { key: "vibeHeel", group: "saber vibe", label: "free heel up (metres)", min: 0, max: 0.12, step: 0.005, value: 0.045 },
-  { key: "vibeWide", group: "saber vibe", label: "feet apart (x)", min: 0.8, max: 2, step: 0.05, value: 1.15 },
-  { key: "vibeHike", group: "saber vibe", label: "hips hiked over the weight (degrees)", min: 0, max: 20, step: 0.5, value: 6 },
-  { key: "vibeTwist", group: "saber vibe", label: "hips turned (degrees)", min: 0, max: 25, step: 0.5, value: 7 },
-  { key: "vibeCounter", group: "saber vibe", label: "chest against the hips (x)", min: 0, max: 2.5, step: 0.05, value: 1.3 },
-  { key: "vibeNod", group: "saber vibe", label: "chest nods into each beat (degrees)", min: 0, max: 15, step: 0.5, value: 4 },
-  { key: "vibeShoulders", group: "saber vibe", label: "shoulders drop each beat (degrees)", min: 0, max: 15, step: 0.5, value: 4 },
-  { key: "vibeNudge", group: "saber vibe", label: "lean towards the notes' side (degrees)", min: 0, max: 15, step: 0.5, value: 3 },
-  { key: "vibeAccent", group: "saber vibe", label: "notes nudge the bounce (x)", min: 0, max: 3, step: 0.05, value: 1 },
-  { key: "vibeBig", group: "saber vibe", label: "dip on the light show's big moments (x)", min: 0, max: 3, step: 0.05, value: 1 },
-  { key: "vibeCalm", group: "saber vibe", label: "how big, calm", min: 0, max: 2, step: 0.01, value: 0.65 },
-  { key: "vibeLively", group: "saber vibe", label: "how big, lively", min: 0, max: 2, step: 0.01, value: 1.05 },
-  { key: "vibeHard", group: "saber vibe", label: "in a drop: bigger by (x)", min: 0, max: 2, step: 0.05, value: 0.45 },
-  { key: "vibeHardAt", group: "saber vibe", label: "a drop: the song this much busier than usual (x)", min: 1.1, max: 4, step: 0.05, value: 1.6 },
-  { key: "vibeFastest", group: "saber vibe", label: "bounces a second, at most", min: 0.5, max: 4, step: 0.05, value: 2.2 },
-  { key: "vibeFastestHard", group: "saber vibe", label: "bounces a second at most, in a drop", min: 0.5, max: 5, step: 0.05, value: 2.8 },
-  { key: "vibeSpring", group: "saber vibe", label: "spring speed (Hz)", min: 1, max: 10, step: 0.1, value: 4 },
-  { key: "vibeSoft", group: "saber vibe", label: "spring damping (higher: smoother)", min: 0.2, max: 1, step: 0.01, value: 0.6 },
-  { key: "vibeWander", group: "saber vibe", label: "moves about (x)", min: 0, max: 3, step: 0.05, value: 0.7 },
-  { key: "vibeTurn", group: "saber vibe", label: "turns about, up to (degrees)", min: 0, max: 45, step: 1, value: 15 },
-  // saber's avatar, line dancing to the song (see line in plugins/saber/public/avatar.js): its 32 counts, a count a
-  // beat (half time when the song is fast); how big its steps and kicks, how much it bounces and swings its hips
-  { key: "lineStep", group: "saber line dance", label: "step size (x)", min: 0, max: 2, step: 0.05, value: 1 },
-  { key: "lineKick", group: "saber line dance", label: "kicks (x)", min: 0, max: 2, step: 0.05, value: 1 },
-  { key: "lineBounce", group: "saber line dance", label: "bounce (x)", min: 0, max: 3, step: 0.05, value: 1 },
-  { key: "lineHips", group: "saber line dance", label: "hips (x)", min: 0, max: 3, step: 0.05, value: 1 },
-  { key: "lineHalf", group: "saber line dance", label: "half time above (bpm)", min: 60, max: 300, step: 1, value: 150 },
-  { key: "lineHop", group: "saber line dance", label: "hop on the light show's big moments (x)", min: 0, max: 3, step: 0.05, value: 1 },
 ];
 
 // (a switch is 0 or 1, off or on: a button on the look pages; a colour is "#rrggbb", and three numbers in the shaders' uniform, in the light's own linear values; every
@@ -175,7 +75,7 @@ for (const d of LOOK) if (d.glsl) { d.slot = slots; slots += d.type === "colour"
 
 export const defaults = () => Object.fromEntries(LOOK.map((d) => [d.key, d.value]));
 // the look as turned (the admin's, kept by the server: what the look page shows), and what is seen now:
-// that, or a look laid over it a while (a saber platform made from a save: see overLook)
+// that, or a look laid over it a while (a plugin's, from a save it was picked: see overLook)
 export const lookBase = defaults();
 export const look = defaults();
 let over = null;
@@ -194,6 +94,21 @@ export function clean(values) {
     else if (d && Number.isFinite(n)) out[key] = clamp(d, n);
   }
   return out;
+}
+
+// a plugin's knobs (see looks in manifest.js), after vvoid's own: never the shaders' (they are made before
+// any plugin is known), never one by a key already taken
+export function addLooks(defs) {
+  for (const d of defs ?? []) {
+    if (!d?.key || BY_KEY.has(d.key)) continue;
+    const own = { ...d };
+    delete own.glsl;
+    LOOK.push(own);
+    BY_KEY.set(own.key, own);
+    lookBase[own.key] ??= own.value;
+    look[own.key] ??= own.value;
+  }
+  apply();
 }
 
 function apply() {
@@ -220,10 +135,12 @@ export const lookOver = () => over;
 // a save's name, as the server keeps it
 export const saveName = (name) => (typeof name === "string" ? name.trim().replace(/\s+/g, " ").slice(0, 40) : "");
 // what the server keeps, from what it was given (the Tab panel's look page, vvoid's panel, a file): the
-// look, the saves by name, and which saves are saber's platforms; whatever it leaves out stays as it was
-// { now: the look, saves: { name: a look }, saber: the names of the saves that are saber's platforms }
+// look, the saves by name, and which saves each plugin has picked (see pick in manifest.js); whatever it
+// leaves out stays as it was
+// { now: the look, saves: { name: a look }, picked: { plugin: the names of the saves it has picked } }
 export const MAX_SAVES = 60;
-export function cleanLooks(given, was = { now: {}, saves: {}, saber: [] }) {
+export const noLooks = () => ({ now: {}, saves: {}, picked: {} });
+export function cleanLooks(given, was = noLooks()) {
   const out = { ...was };
   if (given.now && typeof given.now === "object") out.now = clean(given.now);
   if (given.saves && typeof given.saves === "object") {
@@ -233,8 +150,12 @@ export function cleanLooks(given, was = { now: {}, saves: {}, saber: [] }) {
       if (n && values && typeof values === "object") out.saves[n] = clean(values);
     }
   }
-  if (Array.isArray(given.saber)) out.saber = [...new Set(given.saber.map(saveName))].filter((n) => n && out.saves[n]);
-  else out.saber = out.saber.filter((n) => out.saves[n]);
+  const picked = given.picked && typeof given.picked === "object" ? { ...out.picked, ...given.picked } : out.picked ?? {};
+  out.picked = {};
+  for (const [plugin, names] of Object.entries(picked)) {
+    const kept = Array.isArray(names) ? [...new Set(names.map(saveName))].filter((n) => n && out.saves[n]) : [];
+    if (/^[\w-]+$/.test(plugin) && kept.length) out.picked[plugin] = kept;
+  }
   return out;
 }
 apply();

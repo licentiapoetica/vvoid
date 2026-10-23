@@ -781,7 +781,7 @@ async function loadLook() {
   }
 }
 function renderLook() {
-  const { fields, looks, live, admin } = lookData, box = $("#look");
+  const { fields, picks = [], looks, live, admin } = lookData, box = $("#look");
   const can = !live || admin;
   $("#look-where").textContent = live
     ? admin ? "vvoid is running: what is applied here is seen at once, by everyone in the void (as an admin turns it in the Tab panel)."
@@ -842,7 +842,7 @@ function renderLook() {
   box.append(el("div", { class: "look-group" }, el("h3", {}, "saves"),
     names.length ? el("div", { class: "saves" }, names.map((name) => el("div", { class: "save" },
       el("span", {}, name),
-      looks.saber?.includes(name) && el("em", {}, "saber platform"),
+      picks.filter((p) => looks.picked?.[p.name]?.includes(name)).map((p) => el("em", {}, p.label)),
       el("button", { disabled: !can, title: "its knobs here (then apply)", onclick: () => {
         lookEdit = {};
         for (const f of fields) {

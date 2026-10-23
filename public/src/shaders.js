@@ -95,8 +95,8 @@ float keyLight(vec3 n){ return 0.06 + 0.94 * max(dot(n, KEY_LIGHT), 0.) + 0.18 *
 // and slide past only very slowly as you fly. Now and then one fades out a while, and back.
 const SCAFFOLD = /* glsl */ `
 uniform float uBlocksMany, uBlocksLit; // (how many of them, x1; and how far a light show lights them, 0..1)
-// the light show, as five groups of lights (saber's stage has them: lasers behind, rings, left, right,
-// centre), each as bright as it is now (0..~2) and in its colour; each block answers one of them
+// the light show, as five groups of lights (a plugin's stage may have them: lasers behind, rings, left,
+// right, centre), each as bright as it is now (0..~2) and in its colour; each block answers one of them
 uniform float uBlocksLights[5];
 uniform vec3 uBlocksColours[5];
 const vec3 BLOCK_AT[3] = vec3[3](vec3(0., -0.25, 0.25), vec3(0.25, 0., -0.25), vec3(-0.25, 0.25, 0.));
@@ -152,7 +152,7 @@ vec3 farBlocks(vec3 d, vec3 sky){
       // (lit through by the sky a little while near, so their dark sides are never holes in it; far off,
       // they are what darkens it)
       vec3 lit = (stone * lamp + uFogColor * near) * uLight + sky * 0.6 * near;
-      // a light show (saber's) brings them up out of the haze and glows in them, the near ones most: in its
+      // a light show (a plugin's) brings them up out of the haze and glows in them, the near ones most: in its
       // lights' colours, or as far as the look's colour overrides theirs, in that
       float show = uBlocksLit * uBlocksLights[group] * (0.35 + 0.65 * (1. - smoothstep(BLOCKS_FROM, BLOCKS_TO * 0.8, dist)));
       lit += mix(uBlocksColours[group], LOOK_BLOCKS_COLOUR, LOOK_BLOCKS_COLOUR_MIX) * show * (0.45 + 0.55 * up) * LOOK_BLOCKS_SHOW_GLOW;

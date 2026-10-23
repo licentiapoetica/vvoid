@@ -43,8 +43,8 @@ tcp:5173 tcp:5173` and open `localhost:5173` in its browser. The picture in ther
 screen's glow and glass. It keeps up with the headset's frames: while they come late, each eye's picture is
 drawn a little smaller, then the void is seen less far, then the headset is asked for a step fewer frames
 (90 to 72 on a Quest 2), all of it given back slowly once they come on time (never with the menu up). On
-the screen as in there, a sector out of sight is not drawn. Plugins whose games are windows on the page (mania, say) cannot be seen in there;
-the menu's origin takes you out of them. The saber plugin is made for it.
+the screen as in there, a sector out of sight is not drawn. Plugins whose games are windows on the page cannot be seen in there;
+the menu's origin takes you out of them. A plugin may be made for it.
 
 <details>
 <summary>settings, in <code>.env</code></summary>
@@ -113,6 +113,17 @@ repository. What a plugin is given and the hooks it answers are written down in 
 `VVOID_PASSWORD` in `.env` for all of them, `VVOID_<NAME>_PASSWORD` for one, over it; asked every time,
 unless `VVOID_REMEMBER` (or `VVOID_<NAME>_REMEMBER`: `30d`, `12h`) says how long to remember it (see `locks.js`).
 None is locked unless a password is set.
+
+vvoid names none of them. What a plugin is to it, it says itself, in `plugins/<name>/plugin.json` (every
+field optional; written down in `manifest.js`): what its portal is called (`title`; else its README's first
+heading, else its folder's name), whether it has one (`portal`), where on the circle (`order`), how wide its
+ring is (`hole`), whether it forms its own way (`formsItself`) or goes unnamed under the crosshair (`named`),
+whether what it plays is music (`music`), its window in the Tab panel (`panel`: `id`, `everywhere`), knobs of
+its own on the look page (`looks`), and a button by each saved look to pick it (`pick`):
+
+```json
+{ "title": "the radio", "order": 4, "music": true, "panel": { "everywhere": true } }
+```
 
 Each portal stands in its place on the circle round the clock, the circle shared evenly among them. One can
 be placed elsewhere: `VVOID_<NAME>_PORTAL` is `angle,distance,height`, the angle in degrees round the clock

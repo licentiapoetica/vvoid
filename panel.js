@@ -20,8 +20,9 @@ import { spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from "@simplewebauthn/server";
-import { LOOK, cleanLooks } from "./public/src/look.js";
-import { CELL, REACH, UNIT, PORTAL_ORDER, PORTAL_RING } from "./public/src/constants.js";
+import { LOOK, cleanLooks, addLooks, noLooks } from "./public/src/look.js";
+import { manifestOf, manifestsIn } from "./manifest.js";
+import { CELL, REACH, UNIT, PORTAL_RING, portalOrder } from "./public/src/constants.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(here, ".env");
@@ -184,14 +185,15 @@ async function catalogue() {
   const found = [];
   for (const name of dirs) {
     const dir = path.join(PLUGINS, name), env = `VVOID_${name.toUpperCase().replace(/-/g, "_")}`;
+    const own = await manifestOf(dir, name), page = existsSync(path.join(dir, "public", "client.js")), portal = own.portal && page;
     const text = await fs.readFile(path.join(dir, "README.md"), "utf8").catch(() => "");
     const docs = docsIn(text);
     const names = new Set([...(await namesIn(await codeOf(dir))), ...[...docs.keys()].filter((n) => n === env || n.startsWith(`${env}_`))]);
     names.add(`${env}_PASSWORD`).add(`${env}_REMEMBER`); // (its lock: any plugin may have one)
-    if (PORTAL_ORDER.includes(name)) names.add(`${env}_PORTAL`); // (and its portal's place, if it has one on the circle)
+    if (portal) names.add(`${env}_PORTAL`); // (and its portal's place, if it has one on the circle)
     found.push({ name, env, docs, names });
     const first = text.replace(/^#.*$/gm, "").split(/\n\s*\n/).map(strip).find(Boolean) ?? "";
-    plugins.push({ name, about: abouts.get(name) ?? first, server: existsSync(path.join(dir, "server.js")), page: existsSync(path.join(dir, "public", "client.js")), portal: PORTAL_ORDER.includes(name) });
+    plugins.push({ name, about: abouts.get(name) ?? first, server: existsSync(path.join(dir, "server.js")), page, portal, title: own.title, order: own.order });
   }
   // (a name read by more than one plugin is the one's whose it is by its name, else the first's)
   for (const { name, env, docs, names } of found) {
@@ -229,7 +231,7 @@ async function settings() {
     Object.assign(p, { off: off.has(p.name), locked: !!(effective(`${env}_PASSWORD`, set) ?? effective("VVOID_PASSWORD", set)) });
   }
   // (the circle of portals, for the plugins page's map: see hubSlot in constants.js)
-  const ring = { order: PORTAL_ORDER, radius: PORTAL_RING, cell: CELL, reach: REACH * UNIT };
+  const ring = { order: portalOrder(plugins.filter((p) => p.portal)), radius: PORTAL_RING, cell: CELL, reach: REACH * UNIT };
   return { version: versionOf(text), groups, plugins, ring };
 }
 
@@ -417,14 +419,20 @@ async function vvoidState() {
 }
 
 // ---- the look: through vvoid while it runs (as an admin: its key is in .env), else in its file ----
+// (the plugins' own knobs with vvoid's, as vvoid has them: see looks in manifest.js; and those that pick saves)
+async function pluginLooks() {
+  const all = await manifestsIn(PLUGINS);
+  for (const p of all) addLooks(p.looks);
+  return all.filter((p) => p.pick).map((p) => ({ name: p.name, label: p.pick.label }));
+}
 async function look() {
-  const set = settingsOf(parse(await readEnv())), { up, base } = await probe(set);
+  const set = settingsOf(parse(await readEnv())), { up, base } = await probe(set), picks = await pluginLooks();
   const fields = LOOK.map(({ key, group, label, min, max, step, type, value }) => ({ key, group, label, min, max, step, type, value }));
   if (up) {
     const looks = await fetch(`${base}/api/look`, { signal: AbortSignal.timeout(3000) }).then((r) => r.json()).catch(() => null);
-    if (looks) return { fields, looks, live: true, admin: !!effective("VVOID_ADMIN_KEY", set) };
+    if (looks) return { fields, picks, looks, live: true, admin: !!effective("VVOID_ADMIN_KEY", set) };
   }
-  return { fields, looks: await lookFile(set), live: false };
+  return { fields, picks, looks: await lookFile(set), live: false };
 }
 // ---- what each portal is, beside it in the hub (see about.js): its words, in VVOID_PORTALS; vvoid reads the
 // file again as it changes, so they are seen without it restarting ----
@@ -467,11 +475,12 @@ async function setVanity(name, word) {
 
 const lookPath = (set) => path.resolve(here, effective("VVOID_LOOK", set) ?? path.join(".cache", "look.json"));
 async function lookFile(set) {
+  await pluginLooks(); // (theirs too: else let go as the file is read)
   try {
     const kept = JSON.parse(await fs.readFile(lookPath(set), "utf8"));
     return cleanLooks(kept.now || kept.saves ? kept : { now: kept });
   } catch {
-    return { now: {}, saves: {}, saber: [] };
+    return noLooks();
   }
 }
 async function setLook(given) {

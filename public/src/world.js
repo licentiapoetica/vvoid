@@ -486,7 +486,7 @@ export class World {
       uHazeDir: { value: HAZE.clone() }, uKeyLight: { value: KEY.clone() }, // (where the glow is; the light the blocks have)
       // the blocks far off in the sky: how many (x1; a dimension's spec.blocks), and how far a light show
       // lights them (0..1; let go on leaving its dimension), its five groups of lights each as bright as it
-      // is and in its colour (a plugin's doing, each frame: see saber)
+      // is and in its colour (a plugin's doing, each frame)
       uBlocksMany: { value: 1 }, uBlocksLit: { value: 0 },
       uBlocksLights: { value: new Float32Array(5) }, uBlocksColours: { value: Array.from({ length: 5 }, () => new THREE.Color()) },
       uMote: { value: new THREE.Color() }, // motes in the air's colours (see spec.air)
@@ -544,7 +544,7 @@ export class World {
     this.worms = new Worms(this); // (the light worms: see worms.js)
   }
 
-  // The sectors' shaders made before a sector needs them, as saber makes a map's (one first met holds its frame
+  // The sectors' shaders made before a sector needs them, as a plugin may make its own (one first met holds its frame
   // while it is made: for seconds in a headset's own browser): each kind of piece (a cube, a faceted solid, a
   // recursion of either), the motes, the orbs; for a picture drawn into target (the screen's passes), or straight
   // into the headset (null: another program, its tone mapping its own). Kept, so their programs are kept
@@ -569,8 +569,8 @@ export class World {
     return `${REALMS[this.realm]?.prefix ?? ""}${x},${y},${z}`;
   }
 
-  // A sector of the void seen from outside it, from another dimension (the saber plugin's Auto Vivify takes you to the
-  // hub through its black hole while you play, and draws it round you): built apart from the sectors round you, never
+  // A sector of the void seen from outside it, from another dimension (a plugin may take you to the
+  // hub through a black hole while you play, and draw it round you): built apart from the sectors round you, never
   // one of them, hidden but for whoever draws it, in the void's own air for that drawing (see air). x, y, z: which (the
   // hub's, by default: its clock); raw: its spec, where it is not known here (one fetched from the server's cache). Null
   // if it is not known.
@@ -762,7 +762,7 @@ export class World {
     this.dust.material.uniforms.uCam.value.copy(camera.position);
   }
 
-  // (unseen: a plugin draws the picture itself, the headset's (see saber): the worms, seen by nobody, left as
+  // (unseen: a plugin draws the picture itself, the headset's: the worms, seen by nobody, left as
   // they are, and put round you again when they are seen)
   update(dt, camera, unseen = false) {
     const G = this.G;

@@ -102,7 +102,7 @@ export class PadMap {
   }
 
   // A plugin's own actions, in a group of their own on the controller page (added once: two plugins
-  // sharing a group, as f0ck and 4chan share their tour, give it once). [id, what it does, buttons]
+  // sharing a group, as two may share a tour, give it once). [id, what it does, buttons]
   addActions(group, title, list) {
     if (this.groups[group]) return;
     this.groups[group] = title;

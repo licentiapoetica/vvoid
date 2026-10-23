@@ -9,7 +9,7 @@
 // off outwards and fade. But one whose source does not answer (unreachable(name): see grey.js) is not given
 // up on: it forms on, drawn grey, until its plugin hears from its source and puts up its ring.
 import * as THREE from "three";
-import { hubSlot, PORTAL_FORMS_ITSELF } from "./constants.js";
+import { hubSlot, portalOf } from "./constants.js";
 import { materialize } from "./reach.js";
 
 const RING = 120, HOLE = 104;  // as the plugins' own rings (see theirs)
@@ -116,7 +116,7 @@ export class Forming {
     geometry.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
     const arc = new THREE.TorusGeometry(RING, 2, 6, 160), hole = new THREE.SphereGeometry(HOLE, 40, 24);
     for (const name of names) {
-      if (PORTAL_FORMS_ITSELF.has(name)) continue; // (its own way: see constants.js)
+      if (portalOf(name).formsItself) continue; // (its own way: its plugin says so, see manifest.js)
       const uniforms = {
         uTime: G.uTime, uPx: G.uPx, uPhase: { value: Math.random() * 10 },
         uShow: { value: 0 }, uGrow: { value: 0 }, uEnd: { value: 0 }, uOk: { value: 1 },

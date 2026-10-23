@@ -1,5 +1,5 @@
-// J: a string of something not of this world, shot at the post you are looking at (any post: f0ck's, and
-// the dimensions built on it). It flies as a thin wobbling thread, lands silently, and clings to the screen
+// J: a string of something not of this world, shot at the post you are looking at (any post, in any
+// plugin's dimension). It flies as a thin wobbling thread, lands silently, and clings to the screen
 // as a strand flung out from where it struck: liquid silver, mirror-bright, beading here and there along
 // its length as a thread of it does. Then it flows down the screen, each part of it at its own pace, a
 // faint trail left behind, drips running on ahead with beads at their ends, never past the bottom edge

@@ -9,8 +9,6 @@ export const MODES = {
   pentatonic: [0, 2, 4, 7, 9, 12],
 };
 export const semis = (n) => 2 ** (n / 12);
-// whose media is music (setMedia's who): while one of these plays, Irrlicht gives off notes (see music)
-const MUSIC = new Set(["player", "somafm", "mania", "saber"]);
 // s: as the sound starts (the start screen left), what the picture hears eased in from nothing over this
 // long, as the master is (see start): measured against averages only just begun, a drone coming up
 // reads as a burst, and the whole sky flashed with it
@@ -301,7 +299,7 @@ export class VoidAudio {
 
   // the hall's echo: noise in both ears, dying away over seconds and darkening as it does
   // where what was playing goes as you pass through a portal: a long hall, ringing on after it has stopped
-  // (see the f0ck plugin's ringOut); made the first time it is wanted
+  // (a plugin's to ring out: see ringOut); made the first time it is wanted
   portalTail() {
     if (!this.ctx) return null;
     if (!this.tailIn) {
@@ -377,9 +375,10 @@ export class VoidAudio {
     this.droneLevel.gain.setTargetAtTime(on ? 0.3 : 1, this.ctx.currentTime, 1.5);
   }
 
-  // whether what plugins play now is music (the player, a station, a song in mania), not voices or
-  // posts: Irrlicht gives off notes then (see back.js)
-  get music() { return [...(this.mediaBy ?? [])].some((who) => MUSIC.has(who)); }
+  // whether what plugins play now is music (a song, a station), not voices or posts: Irrlicht gives off
+  // notes then (see back.js). Whose is music (setMedia's who): each plugin says (music, in its plugin.json:
+  // see manifest.js), and main.js sets them here as the plugins are known
+  get music() { return [...(this.mediaBy ?? [])].some((who) => this.musical?.has(who)); }
 
   // step back while something else has the stage (a Flash piece with its own sound)
   duck(on) {

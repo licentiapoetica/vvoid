@@ -11,7 +11,8 @@ import { population } from "./public/src/population.js";
 import { makeLock } from "./locks.js";
 import { makeSlots } from "./slots.js";
 import { makeAdmin } from "./admin.js";
-import { cleanLooks } from "./public/src/look.js";
+import { cleanLooks, addLooks, noLooks } from "./public/src/look.js";
+import { manifestOf } from "./manifest.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(here, "public");
@@ -20,11 +21,7 @@ const RUFFLE_DIR = path.join(here, "node_modules", "@ruffle-rs", "ruffle");
 const CACHE = path.resolve(here, process.env.VVOID_CACHE ?? path.join(".cache", "sectors"));
 // the void's look as an admin has turned it (see public/src/look.js): kept here, the same for everyone
 const LOOK_FILE = path.resolve(here, process.env.VVOID_LOOK ?? path.join(".cache", "look.json"));
-let looks = { now: {}, saves: {}, saber: [] };
-try {
-  const kept = JSON.parse(await fs.readFile(LOOK_FILE, "utf8"));
-  looks = cleanLooks(kept.now || kept.saves ? kept : { now: kept }); // (kept before there were saves: the look alone)
-} catch {} // (none yet: vvoid's own)
+let looks = noLooks(); // (read once the plugins are, their knobs with them: see below)
 
 const PORT = Number(process.env.PORT ?? 5173);
 const HOST = process.env.VVOID_HOST ?? "127.0.0.1"; // not HOST: shells often preset that to the hostname
@@ -652,7 +649,9 @@ const vvoidOwns = (req, pathname) => (pathname === "/" ? req.headers["sec-fetch-
 // can be locked behind a password (see locks.js): it is given its lock, `lock.set` whether it is locked and
 // `lock.open(req)` whether a request has the session, and may return `unlocked`, routes of its own that
 // stay open without one. And reach(ok): whether its source answers (a site it reads, an instance it
-// passes through), said as it hears from it or fails to; while it does not, its portal is drawn grey.
+// passes through), said as it hears from it or fails to; while it does not, its portal is drawn grey. What
+// it is to vvoid besides (its portal's name and place, its knobs on the look page, ...) it says in its
+// plugin.json (see manifest.js).
 const PLUGINS = path.join(here, "plugins");
 // where a plugin's portal stands, if an admin has said: VVOID_<NAME>_PORTAL, "angle,distance,height" (the angle
 // in degrees round the clock, 0 straight ahead as you arrive and 90 a quarter turn right; the distance from
@@ -719,6 +718,8 @@ const claude = {
   },
 };
 const HUB_EXTRAS = []; // what plugins have added to the hub, as Claude is told when it dreams beside it
+// (clientPlugins: those with a page, each what it says of itself and where its page's script is, { url,
+// ...its manifest }: the page is given them, /api/plugins)
 const serverPlugins = [], clientPlugins = [];
 const locks = new Map(); // plugin name -> its lock, for those with a password
 const unreachable = new Set(); // the plugins whose source does not answer (never said: it is taken to answer)
@@ -739,6 +740,8 @@ for (const entry of (await fs.readdir(PLUGINS, { withFileTypes: true }).catch(()
     const place = portalPlace(process.env[`VVOID_${entry.name.toUpperCase().replace(/-/g, "_")}_PORTAL`]);
     if (place) PORTAL_PLACES[entry.name] = place;
     if (lock.set) locks.set(entry.name, lock);
+    const said = await manifestOf(dir, entry.name);
+    addLooks(said.looks); // (its knobs, kept with vvoid's own: see look.js)
     if (existsSync(path.join(dir, "server.js"))) {
       const reach = (ok) => {
         if (ok === unreachable.has(entry.name)) console.log(`[vvoid] ${entry.name}: ${ok ? "its source answers again" : "its source does not answer"}`);
@@ -750,12 +753,17 @@ for (const entry of (await fs.readdir(PLUGINS, { withFileTypes: true }).catch(()
       if (made) serverPlugins.push(made);
       lock.unlocked = made?.unlocked ?? [];
     }
-    if (existsSync(path.join(dir, "public", "client.js"))) clientPlugins.push(`/plugins/${entry.name}/client.js`);
+    if (existsSync(path.join(dir, "public", "client.js"))) clientPlugins.push({ url: `/plugins/${entry.name}/client.js`, ...said });
     console.log(`[vvoid] plugin: ${entry.name}${place ? ` (its portal placed: ${place.angle}°${place.ring !== undefined ? `, ${place.ring} out` : ""}${place.height ? `, ${place.height} up` : ""})` : ""}`);
   } catch (err) {
     console.warn(`[vvoid] the plugin ${entry.name} could not be loaded: ${err.message}`);
   }
 }
+// the look as kept, now that every plugin's knobs are known (read before, theirs would be let go)
+try {
+  const kept = JSON.parse(await fs.readFile(LOOK_FILE, "utf8"));
+  looks = cleanLooks(kept.now || kept.saves ? kept : { now: kept }); // (kept before there were saves: the look alone)
+} catch {} // (none yet: vvoid's own)
 
 const server = http.createServer(async (req, res) => {
   // (what is said is what it is; and vvoid is framed by no one else's page)
@@ -773,7 +781,7 @@ const server = http.createServer(async (req, res) => {
     const word = (req.method === "GET" || req.method === "HEAD") && req.headers["sec-fetch-dest"] !== "iframe" && url.pathname.match(/^\/([a-z0-9][a-z0-9-]{0,39})\/?$/i);
     if (word) {
       const name = (await portalsRead()).to.get(word[1].toLowerCase());
-      if (name && clientPlugins.includes(`/plugins/${name}/client.js`)) {
+      if (name && clientPlugins.some((p) => p.name === name)) {
         const to = new URLSearchParams(url.search);
         to.set("p", name);
         res.writeHead(302, { location: `/?${to}`, "cache-control": "no-store" });

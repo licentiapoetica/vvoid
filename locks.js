@@ -43,8 +43,8 @@ export function makeLock(name, { here, send, readBody, whoIs, admin }) {
   const SESSION_FOR = remember || PASSING;
   const cache = path.resolve(here, process.env[`VVOID_${env}_CACHE`] || path.join(".cache", name));
   const file = path.join(cache, "sessions.json");
-  // (for the whole site: a plugin may answer elsewhere than under /plugins/<name>/, f0ck's /api/f0ck and its
-  // instance passed through, and asks its lock there)
+  // (for the whole site: a plugin may answer elsewhere than under /plugins/<name>/, under /api/<name>,
+  // or a site it passes through, and asks its lock there)
   const cookie = `vvoid_${name}`, scope = "Path=/; HttpOnly; SameSite=Strict";
   const log = (line) => console.log(`[vvoid] ${name}: ${line}`);
 

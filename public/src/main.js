@@ -19,7 +19,7 @@ import { Forming } from "./forming.js";
 import { Grey } from "./grey.js";
 import { Abouts } from "./about.js";
 import { PadMap } from "./pad.js";
-import { SPAWN, setPortals, hubSlot, portalNames, PORTAL_SEEN, PORTAL_FORMS_ITSELF } from "./constants.js";
+import { SPAWN, setPortals, hubSlot, portalNames, portalTitle, portalOf, PORTAL_SEEN, PORTAL_HOLE } from "./constants.js";
 import { draggablePanels } from "./panels.js";
 import { Locks } from "./locks.js";
 import { Slots } from "./slots.js";
@@ -32,7 +32,7 @@ import { VoidXR, standalone } from "./xr.js";
 import { VoidHud } from "./vrhud.js";
 import { Arrival } from "./arrival.js";
 import { writePlace, readPlace } from "./share.js";
-import { LOOK, lookBase, setLook, saveName, defaults as lookDefaults } from "./look.js";
+import { LOOK, lookBase, setLook, addLooks, saveName, defaults as lookDefaults } from "./look.js";
 import { PerfHud } from "./perfhud.js";
 
 const $ = (id) => document.getElementById(id);
@@ -102,7 +102,7 @@ bloom.materialHighPassFilter.fragmentShader = bloom.materialHighPassFilter.fragm
 );
 // the glow is added to the colour only: over such a hole it glows, without filling it
 Object.assign(bloom.blendMaterial, { blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
-// A dimension whose picture is never a window onto the page behind it (a plugin's opaque hook: saber's,
+// A dimension whose picture is never a window onto the page behind it (a plugin's opaque hook,
 // whose maps' Unity shaders write a glow's strength in their alpha, not how see-through they are): its
 // alpha made whole before it is shown, its colour untouched. Off, costing nothing, everywhere else
 const opaquePass = new (class extends Pass {
@@ -154,6 +154,13 @@ function applyGraphics() {
 applyGraphics();
 
 const audio = new VoidAudio();
+// the plugins this vvoid has, each as it says of itself (see manifest.js: what its portal is called, where it
+// stands, whether it plays music, its window, its knobs on the look page): asked at once, installed at the end
+const pluginList = fetch("/api/plugins").then((r) => (r.ok ? r.json() : [])).then((list) => (Array.isArray(list) ? list : []), () => []).then((list) => {
+  audio.musical = new Set(list.filter((p) => p.music).map((p) => p.name));
+  for (const p of list) addLooks(p.looks);
+  return list;
+});
 
 // ---- HUD ----
 
@@ -296,17 +303,17 @@ function face(toYaw, toPitch) {
   pitch = viewPitch + Math.atan2(Math.sin(toPitch - viewPitch), Math.cos(toPitch - viewPitch));
 }
 // coming out of a portal (or sitting down somewhere): face this way and lose most of your speed (keep: how
-// much of it is kept, a tenth unless said; none, for a place you are put down in to stay, as saber's platform)
+// much of it is kept, a tenth unless said; none, for a place you are put down in to stay, as a plugin's platform)
 function arrive(toYaw, toPitch, keep = 0.1) {
   face(toYaw, toPitch);
   velocity.multiplyScalar(keep);
 }
 const meteors = new Meteors({ scene, world }); // now and then a shooting star, far out in the void
-const lasers = new Lasers({ scene, world });   // yours (a portal clicked, V) and, with the together plugin, the others'
+const lasers = new Lasers({ scene, world });   // yours (a portal clicked, V) and, with a plugin that brings others in, theirs
 const forming = new Forming({ scene, world }); // the portals round the clock whose plugins are still on their way
 const grey = new Grey({ scene, world, known: () => forming.known, forming: (name) => forming.rings.get(name)?.group }); // and those whose source does not answer, grey
 forming.unreachable = (name) => grey.has(name); // (formed on, grey, not given up on)
-const abouts = new Abouts({ scene, world, camera, nameOf: (name) => PORTAL_NAMES[name] ?? name, ownerOf: (realm) => realmOwner[realm], exits: () => hook("exit") }); // and what each is, inside it beside its way back (see about.js)
+const abouts = new Abouts({ scene, world, camera, nameOf: portalTitle, ownerOf: (realm) => realmOwner[realm], exits: () => hook("exit") }); // and what each is, inside it beside its way back (see about.js)
 const goo = new Goo({ scene, world, storeEl: $("gooStore"), muzzle: (camera) => lasers.muzzle(camera) }); // J: shot at the post looked at (see goo.js)
 // V (or the laser button on a touch screen): a shot straight ahead, into the dark
 function fireLaser() {
@@ -473,9 +480,9 @@ function teleport(realm, x, y, z) {
   veil = Math.max(veil, 1.1); // the jump happens in the dark, which lifts
 }
 // Somewhere at once, in the dark that lifts: out of the room you are in if it is left behind, into the
-// place's dimension, its room ({ key, label } of the viewer that dimension is: see the f0ck plugin), and
+// place's dimension, its room ({ key, label } of the viewer that dimension is: a plugin's), and
 // there, facing as given. The way back's places carry their viewer, and are always put back in its room;
-// anyone else's (a group's leader's: see the together plugin) only when it is another room.
+// anyone else's (a group's leader's, a plugin's) only when it is another room.
 function goTo(place) {
   if (lockedOut(place.realm, () => goTo(place))) return; // (its password first)
   stopFlying();
@@ -501,7 +508,7 @@ function turnBack() {
   store("irrlichtToOrigin", toOrigin);
   note(toOrigin ? `${COMPANION} takes you to the origin now · right click: back` : `${COMPANION} takes you back now · right click: to the origin`);
 }
-// A plugin keeping you where you are (the together plugin's group, whose members go only where its leader
+// A plugin keeping you where you are (a plugin's group, whose members go only where its leader
 // goes): no portal, no way back, no jump by the map. Its reason is said instead, and returned.
 function held(say = note) {
   const why = hook("hold");
@@ -625,7 +632,7 @@ const HELP = {
 };
 let helpMode = "keys", noteTimer = 0, wakeTimer = 0;
 // The keys, in the Tab panel: vvoid's own (the keyboard's or the gamepad's, whichever was used last),
-// then each plugin's ("in f0ck: e open · ..."), every one a key and what it does. Held in a plugin's
+// then each plugin's ("in <its dimension>: e open · ..."), every one a key and what it does. Held in a plugin's
 // seat (a game: see the seat hook), its keys come first, and stay on the screen as well.
 function showHelp(mode = helpMode) {
   helpMode = mode;
@@ -893,7 +900,7 @@ async function comePortal(name) {
   teleport("void", from.x, from.y, from.z);
   const to = at.clone().sub(from);
   face(Math.atan2(-to.x, -to.z), 0);
-  const into = () => note(`into ${PORTAL_NAMES[name] ?? name}`);
+  const into = () => note(`into ${portalTitle(name)}`);
   if (arrival.open(() => { audio.sting(); into(); })) veil = 0; // (the jump hidden in the portal's dark, not the veil's)
   else into();
   // (its ring formed first, a few seconds at most: unreachable, it says so, and you are left before it)
@@ -1092,8 +1099,8 @@ async function toggleFullscreen() {
     lockPointer();
   } catch { /* fullscreen refused: nothing to undo */ }
 }
-// F11 does what F does, always. A page in fullscreen holding the keyboard (F, or bhop's) is handed F11 instead
-// of the browser, and a plugin may take every key while it plays (mania): so it is caught here, first. (The
+// F11 does what F does, always. A page in fullscreen holding the keyboard (F, or a plugin's) is handed F11 instead
+// of the browser, and a plugin may take every key while it plays: so it is caught here, first. (The
 // browser's own fullscreen, from an F11 it was given before, is left to the browser to undo.)
 // F4: how it runs, over the picture (frames, work, what is drawn and kept, the plugins' own numbers), anywhere
 window.addEventListener("keydown", (e) => {
@@ -1232,46 +1239,53 @@ $("mCredits").addEventListener("click", () => {
 });
 // The void's look (see look.js): as the server keeps it, for everyone; and for an admin, the Tab panel's
 // look page, in the keys' place like the credits, every setting of it turned live and kept as it is turned,
-// with saves of it by name (loaded again at will, and any of them saber's as a platform of its own)
-const looks = { saves: {}, saber: [] };
-fetch("/api/look").then((res) => (res.ok ? res.json() : null)).then((kept) => {
+// with saves of it by name (loaded again at will, and any of them picked by a plugin that picks them: see
+// pick in manifest.js). The plugins' own knobs first: the look as kept has theirs too.
+const looks = { saves: {}, picked: {} };
+Promise.all([fetch("/api/look").then((res) => (res.ok ? res.json() : null)).catch(() => null), pluginList]).then(([kept]) => {
   if (!kept) return;
   setLook(kept.now ?? {});
-  Object.assign(looks, { saves: kept.saves ?? {}, saber: kept.saber ?? [] });
-}).catch(() => {}).finally(buildLook);
+  Object.assign(looks, { saves: kept.saves ?? {}, picked: kept.picked ?? {} });
+}).finally(buildLook);
 let lookSaving = null, showLookRows = () => {};
 async function sendLooks(body) {
   $("lookSaid").textContent = "· …";
   const res = await fetch("/api/look", { method: "PUT", headers: { "x-vvoid-lock": "1", "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
   const data = res && (await res.json().catch(() => null));
   $("lookSaid").textContent = res?.ok ? "· kept" : `· not kept: ${data?.error ?? "the server does not answer"}`;
-  if (res?.ok && data) { Object.assign(looks, { saves: data.saves ?? {}, saber: data.saber ?? [] }); showSaves(); }
+  if (res?.ok && data) { Object.assign(looks, { saves: data.saves ?? {}, picked: data.picked ?? {} }); showSaves(); }
 }
 function keepLook() {
   clearTimeout(lookSaving);
   $("lookSaid").textContent = "· …";
   lookSaving = setTimeout(() => sendLooks({ now: lookBase }), 500);
 }
-// the saves: a name and save (the same name again: saved over), and each one's load, whether it is a
-// platform in saber, and away
+// the saves: a name and save (the same name again: saved over), and each one's load, whether each plugin
+// that picks saves has picked it, and away
+let pickers = []; // the plugins that pick saves (see pick in manifest.js)
+pluginList.then((list) => { pickers = list.filter((p) => p.pick); });
 function showSaves() {
   const list = $("lookSaves");
   list.replaceChildren();
   for (const name of Object.keys(looks.saves)) {
     const row = Object.assign(document.createElement("div"), { className: "row save" });
     const load = Object.assign(document.createElement("button"), { textContent: "load", title: "the void's look, as it was saved (for everyone)" });
-    const saber = Object.assign(document.createElement("button"), { textContent: "saber", title: "a platform of its own in saber: the void round you, in this look (only there)" });
+    const picks = pickers.map((p) => {
+      const now = looks.picked[p.name] ?? [];
+      const pick = Object.assign(document.createElement("button"), { textContent: p.pick.label, title: p.pick.about });
+      pick.classList.toggle("on", now.includes(name));
+      pick.onclick = () => sendLooks({ picked: { [p.name]: now.includes(name) ? now.filter((n) => n !== name) : [...now, name] } });
+      return pick;
+    });
     const away = Object.assign(document.createElement("button"), { textContent: "×", title: "away with it" });
-    saber.classList.toggle("on", looks.saber.includes(name));
     load.onclick = () => { setLook(looks.saves[name]); showLookRows(); keepLook(); $("lookName").value = name; };
-    saber.onclick = () => sendLooks({ saber: looks.saber.includes(name) ? looks.saber.filter((n) => n !== name) : [...looks.saber, name] });
     away.onclick = () => {
       if (!confirm(`away with the look "${name}"?`)) return;
       const saves = { ...looks.saves };
       delete saves[name];
-      sendLooks({ saves, saber: looks.saber.filter((n) => n !== name) });
+      sendLooks({ saves }); // (its picks go with it: see cleanLooks)
     };
-    row.append(Object.assign(document.createElement("span"), { textContent: name, title: name }), load, saber, away);
+    row.append(Object.assign(document.createElement("span"), { textContent: name, title: name }), load, ...picks, away);
     list.append(row);
   }
   if (!list.children.length) list.append(Object.assign(document.createElement("div"), { className: "of", textContent: "none yet: name the look as it is now, and save it" }));
@@ -1364,7 +1378,7 @@ window.addEventListener("gamepadconnected", () => {
 
 // Touch: drag to look, hold a second finger to fly forward, hold one still to zoom in (until it is
 // lifted: it still looks round). A tap (one finger, short, hardly moved) with the crosshair on a portal
-// flies you into it, and on anything else is a click (a post in f0ck and the like: listened to and flown
+// flies you into it, and on anything else is a click (a post in a plugin's dimension and the like: listened to and flown
 // to); a double tap flies you on ahead, fast (into a portal under the crosshair, fast), until a tap.
 // The buttons (see touch.js) do what keys do: the stick walks or flies, and jump, duck, use, let go.
 const touches = new Map();
@@ -1382,18 +1396,17 @@ function stopFlying() {
 }
 // the portal the crosshair is on, if any: in the hub, one round the clock; in a plugin's dimension, its
 // way out (a plugin's exit hook: { at, label, hole? }, or several, while you are in its dimension)
-// (what each is called, under the crosshair while it is on one: see showPortalName)
-const PORTAL_HOLES = { zone: 112, pt: 220 }; // (how wide a ring's dark sphere is, where it is not the usual)
-const PORTAL_NAMES = { f0ck: "f0ck", z0r: "z0r", gumo: "gumo", somafm: "somafm", player: "the player", files: "your files", zone: "the zone", chan: "4chan", shorts: "youtube shorts", tiktok: "tiktok", redgifs: "redgifs", efukt: "efukt", marderchen: "marderchen", discord: "discord", watch: "watch together", bhop: "bhop", mania: "mania", saber: "saber", edge: "the edge", pt: "p.t." };
+// (what each is called, under the crosshair while it is on one: see showPortalName, and portalTitle; how wide
+// its dark sphere is, and whether it is seen from afar, its plugin's say: see manifest.js)
 function portalAimedAt() {
   // (each with the size of its dark sphere: the crosshair on that, and nowhere round it; the way back
   // floating beside you, wherever you are)
-  // (on foot, as in bhop, not when you have walked or hopped into it: it fills the view then, and the
+  // (on foot, not when you have walked or hopped into it: it fills the view then, and the
   // click is the knife's, not a way back; from a step away it is clicked as ever)
   const intoIt = back.afoot && back.position.distanceTo(camera.position) < BACK_HOLE * 6 * back.size;
   const spots = back.ready && !intoIt ? [{ name: "back", label: back.label, at: back.position, hole: BACK_HOLE * back.size }] : [];
   // (each only as far as it is seen: see reach.js)
-  if (world.realm === "void") spots.push(...portalNames().map((name) => ({ name, at: new THREE.Vector3(...hubSlot(name).at), hole: PORTAL_HOLES[name] ?? 104, near: PORTAL_FORMS_ITSELF.has(name) ? undefined : PORTAL_SEEN })));
+  if (world.realm === "void") spots.push(...portalNames().map((name) => ({ name, at: new THREE.Vector3(...hubSlot(name).at), hole: portalOf(name).hole ?? PORTAL_HOLE, near: portalOf(name).formsItself ? undefined : PORTAL_SEEN })));
   else spots.push(...[].concat(hook("exit") ?? []).map((exit) => ({ name: "exit", hole: 104, ...exit })));
   const ahead = camera.getWorldDirection(new THREE.Vector3());
   let best = null, bestOff = 0;
@@ -1409,14 +1422,14 @@ function portalAimedAt() {
 // further: see fly); double clicked or double tapped (fast), in as fast as anything flies
 function flyIntoPortal(portal, fast = false) {
   if (held()) return;
-  if (forming.has(portal.name)) return note(`${PORTAL_NAMES[portal.name] ?? portal.name} · ${grey.has(portal.name) ? "unreachable" : "still forming"}`); // (its plugin not there yet, or its source not answering: nothing to fly into)
+  if (forming.has(portal.name)) return note(`${portalTitle(portal.name)} · ${grey.has(portal.name) ? "unreachable" : "still forming"}`); // (its plugin not there yet, or its source not answering: nothing to fly into)
   if (portal.name === "back" && !back.next) return note(back.toOrigin ? `${COMPANION} · you are at the origin` : `${COMPANION} · nowhere to go back to yet`); // (in the hub, before you have been anywhere: only company)
   // clicked again at once (a double click) on the way into the same one: faster (the same by its name,
-  // not to the unit: a way through may sway, as somafm's favourites under their stations do)
+  // not to the unit: a way through may sway, as a plugin's may, under what it stands for)
   const same = portalFlight && portalFlight.name === portal.name && portalFlight.label === portal.label && portalFlight.at.distanceTo(portal.at) < 400;
   if (same && (fast || performance.now() - portalFlight.since < 450)) {
     portalFlight.fast = true;
-    return note(`${portal.name === "exit" ? portal.label : `into ${portal.label ?? PORTAL_NAMES[portal.name] ?? portal.name}`} · faster`);
+    return note(`${portal.name === "exit" ? portal.label : `into ${portal.label ?? portalTitle(portal.name)}`} · faster`);
   }
   if (portal.name === "back") hook("autofly", false); // (on a tour: the tour is over, you are going back)
   const to = portal.at.clone().sub(camera.position), length = to.length() || 1;
@@ -1427,38 +1440,36 @@ function flyIntoPortal(portal, fast = false) {
   const flight = portalFlight;
   if (portal.name === "back") lasers.shoot({ from: lasers.muzzle(camera), to: portal.at, fade: 0.3 });
   else lasers.shoot({ from: lasers.muzzle(camera), to: portal.at, hold: () => portalFlight === flight });
-  note(`${portal.label ?? `into ${PORTAL_NAMES[portal.name] ?? portal.name}`}${fast ? " · faster" : ""} · ${matchMedia("(pointer: coarse)").matches ? "tap to stop" : "s to stop"}`);
+  note(`${portal.label ?? `into ${portalTitle(portal.name)}`}${fast ? " · faster" : ""} · ${matchMedia("(pointer: coarse)").matches ? "tap to stop" : "s to stop"}`);
 }
-// the portal the crosshair is on, named under it (as a post's portals are in f0ck's dimensions)
+// the portal the crosshair is on, named under it (as a post's portals are in a plugin's dimensions)
 // The Tab panel inside a dimension: its own window and the general ones (the map's, the keys, graphics,
 // the controller), not every other dimension's too; in the hub, where you choose where to go, all of them.
-// A plugin's window is known by its id (<name>Panel, or one named here) and the dimension it belongs to.
-const PANEL_REALMS = { f0ckPanel: "f0ck", chanPanel: "chan", tiktokPanel: "tiktok", redgifsPanel: "redgifs", efuktPanel: "efukt", shortsPanel: "shorts", z0rPanel: "z0r", somaPanel: "somafm", filesPanel: "files" };
-// whose each plugin's window is: one behind a password (see locks.js) shows only inside its own
-// dimensions, never in the hub (its settings are had in it, past its password)
-const PANEL_PLUGINS = { ...PANEL_REALMS, playerPanel: "player", bhopPanel: "bhop", edgePanel: "edge" };
-let panelsFor = null;
+// A plugin's window is known by its id (<name>Panel, unless its plugin.json says: see panel in manifest.js),
+// shown in the hub and in the plugin's own dimensions, or everywhere if it says so. One behind a password
+// (see locks.js) shows only inside its own dimensions, never in the hub (its settings are had in it, past
+// its password).
+let panelsFor = null, panelsOf = [];
 function showPanelsFor() {
   const realm = world.realm;
   if (realm === panelsFor) return;
   panelsFor = realm;
-  for (const [id, plugin] of Object.entries(PANEL_PLUGINS)) {
-    const own = PANEL_REALMS[id], away = (own && realm !== "void" && realm !== own) || (locks.has(plugin) && realmOwner[realm] !== plugin);
-    document.getElementById(id)?.classList.toggle("elsewhere", away);
+  for (const { name, panel } of panelsOf) {
+    const its = realmOwner[realm] === name, away = (!panel.everywhere && realm !== "void" && !its) || (locks.has(name) && !its);
+    document.getElementById(panel.id)?.classList.toggle("elsewhere", away);
   }
 }
 let portalNameEl = null;
-// (portals that are not named under the crosshair: p.t.'s is only a door, and says nothing)
-const PORTAL_UNNAMED = new Set(["pt"]);
+// (a portal its plugin says is not named under the crosshair, only a door that says nothing: see manifest.js)
 function showPortalName() {
   const aimed = started && !map.open && !portalFlight && !stillNow() ? portalAimedAt() : null;
-  const portal = aimed && !PORTAL_UNNAMED.has(aimed.name) ? aimed : null;
+  const portal = aimed && portalOf(aimed.name).named !== false ? aimed : null;
   if (!portalNameEl && !portal) return;
   if (!portalNameEl) {
     portalNameEl = Object.assign(document.body.appendChild(document.createElement("div")), { id: "hubPortalName" });
     Object.assign(portalNameEl.style, { position: "fixed", left: "50%", top: "calc(50% + 22px)", transform: "translateX(-50%)", zIndex: 3, pointerEvents: "none", padding: "3px 10px", background: "rgba(2, 3, 14, .62)", color: "#bfe6ff", font: '400 14px "Helvetica Neue", Helvetica, Arial, sans-serif', letterSpacing: ".1em", whiteSpace: "nowrap", transition: "opacity .15s ease", opacity: "0" });
   }
-  if (portal) portalNameEl.textContent = `${portal.label ?? PORTAL_NAMES[portal.name] ?? portal.name}${grey.has(portal.name) ? " · unreachable" : forming.has(portal.name) ? " · forming" : ""}`;
+  if (portal) portalNameEl.textContent = `${portal.label ?? portalTitle(portal.name)}${grey.has(portal.name) ? " · unreachable" : forming.has(portal.name) ? " · forming" : ""}`;
   portalNameEl.style.opacity = portal ? "1" : "0";
 }
 function tap() {
@@ -1569,8 +1580,8 @@ window.addEventListener("touchend", touchEnd);
 window.addEventListener("touchcancel", touchEnd);
 if (matchMedia("(pointer: coarse)").matches) $("prompt").textContent = "tap to materialize · drag to look · hold to zoom · double tap to fly fast · tap a portal to fly into it";
 
-// A touch button's key, as if it were pressed (see touch.js): to the plugins first, as a key is (bhop's
-// space, the edge's c), and else held for flying, as vvoid's own keys are. True when a plugin took it.
+// A touch button's key, as if it were pressed (see touch.js): to the plugins first, as a key is (a
+// game's space or c), and else held for flying, as vvoid's own keys are. True when a plugin took it.
 function virtualKey(code, down) {
   const e = {
     type: down ? "keydown" : "keyup", code, key: code === "Space" ? " " : code.replace(/^Key/, "").toLowerCase(), repeat: false, touch: true,
@@ -1598,7 +1609,7 @@ function touchStick(x, y) {
   }
 }
 // the use button: a portal under the crosshair flown into (as a tap); else what you are with opened (as the
-// controller's interact); on foot, the game's e (bhop's: a map's buttons); with nothing there, recentred
+// controller's interact); on foot, the game's e (a plugin's: a map's buttons); with nothing there, recentred
 function useTouch() {
   const portal = portalAimedAt();
   if (portal) return flyIntoPortal(portal);
@@ -1814,7 +1825,7 @@ let skyCube = null;
 // (a headset's frames come at its own rate, and missing them is felt: see pace.js)
 let headsetPace = null;
 // A plugin's own world drawn alone, on black: the void's sky, its places, its portals, every other plugin's world
-// left out of the picture while it is drawn (the saber plugin's Vivify maps, as Beat Saber shows them: 42-flux's
+// left out of the picture while it is drawn (a plugin's own worlds, as the games they come from show them:
 // desert had the void behind it, and the way back to the hub hanging in its sky as a black disc in a red ring).
 // Irrlicht stays, and the lights. The scene's fog is left as it is (its materials would be made again each frame)
 const ALONE_BACKGROUND = new THREE.Color(0x000000);
@@ -1898,8 +1909,8 @@ function frameWork(now) {
   leftLocked();
   const heard = audio.features(dt);
   world.G.uBass.value = heard.bass; world.G.uMid.value = heard.mid; world.G.uHigh.value = heard.high; world.G.uBeat.value = heard.beat;
-  world.G.uPulse.value = 0; // (a plugin keeping the nebula on its song's beat sets it again, in its update: see saber)
-  // (a plugin's own world standing alone on black, loading or playing (the saber plugin's Vivify maps): the void's
+  world.G.uPulse.value = 0; // (a plugin keeping the nebula on its song's beat sets it again, in its update)
+  // (a plugin's own world standing alone on black, loading or playing (a plugin's own world): the void's
   // light worms rest, hidden and not moved, till it is over. The void itself stays as it is, the base everything
   // comes back to)
   const resting = started && !!hook("rest");
@@ -1918,7 +1929,7 @@ function frameWork(now) {
       back.watching = at ? at.picked ?? { id: world.realm, text: "" } : null;
     }
     back.heard = heard;
-    // (held where you are, it keeps away, unless a plugin keeps it somewhere this frame (saber's platform, a song
+    // (held where you are, it keeps away, unless a plugin keeps it somewhere this frame (a plugin's platform, a song
     // played: see back.pin), and then it is only company, taking you nowhere; the Tab panel open, it stays)
     const holding = !!hook("hold");
     if (back.update(dt, camera, started && (!holding || !!back.pin)) && !holding) goBack();
@@ -1943,7 +1954,7 @@ function frameWork(now) {
   arrival.update(dt);
   cinema.update(dt, cinemaSubject(), camera.position);
   document.body.classList.toggle("cinema", cinema.on);
-  // a plugin drawing the picture itself (a headset's, see the saber plugin: the passes below are the
+  // a plugin drawing the picture itself (a headset's, a plugin's: the passes below are the
   // screen's, and a headset has none of them), and the rest of the frame's drawing left to it
   pluginDraws = started && !!hook("draw", renderer, dt);
   if (pluginDraws) { headsetPace?.release(); vrHud?.hide(); audio.setSpeed(velocity.length()); showPortalName(); showPanelsFor(); return; }
@@ -1988,11 +1999,11 @@ const locksKnown = locks.load();
 locks.refused = refused; // (a wrong password: the void answers it)
 locks.declined = declined; // (none given, Esc: and that too, quietly)
 runFrames();
-// a headset put on (by a plugin: see the saber plugin) or taken off: its frames, or the screen's again
+// a headset put on (by a plugin) or taken off: its frames, or the screen's again
 renderer.xr.addEventListener("sessionstart", runFrames);
 renderer.xr.addEventListener("sessionend", () => { runFrames(); resize(); });
 
-// (viewers: the f0ck plugin's viewers, each registering itself as it is made: see back.js)
+// (viewers: a plugin's viewers, each registering itself as it is made: see back.js)
 window.vvoid = {
   world, camera, renderer, entity, back, voice, map, plugins, padMap, CELL, graphics: gfx, viewers: [], meteors, lasers, aim(y, p) { yaw = viewYaw = y; pitch = viewPitch = p; },
   lastDrawn, // ({ calls, triangles }: the last whole frame's, all its passes)
@@ -2006,8 +2017,8 @@ window.vvoid = {
   locked: (realm, retry, look) => lockedOut(realm, retry, look), // (look: the gate's { title, color }, if not its own)
   // Still a while (the crosshair gone: see STILL), until the next look round, key or button
   still: stillNow,
-  // Others kept out of sight: a plugin's own moment that wants you alone in it (saber's song, played or
-  // watched), asked by whatever draws the other travellers (the together plugin)
+  // Others kept out of sight: a plugin's own moment that wants you alone in it (a song, played or
+  // watched), asked by whatever draws the other travellers (a plugin)
   alone: () => !!hook("alone"),
 };
 
@@ -2109,17 +2120,17 @@ function installStyled(install) {
   });
   return result;
 }
-// the plugins this vvoid has: first, where their portals stand round the clock (evenly, or where an admin
-// has placed them: see hubSlot), then each
-const [pluginUrls, portalPlaces] = await Promise.all([
-  fetch("/api/plugins").then((r) => (r.ok ? r.json() : [])).catch(() => []),
-  fetch("/api/portals", { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).then((d) => d.places ?? {}, () => ({})),
+// the plugins this vvoid has (see pluginList): first, where their portals stand round the clock (evenly, in
+// their order, or where an admin has placed them: see hubSlot), then each
+const [pluginsHere, portalPlaces] = await Promise.all([
+  pluginList,
+  fetch("/api/portals", { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).then((d) => d?.places ?? {}, () => ({})),
   locksKnown,
 ]);
-setPortals(pluginUrls.map((url) => url.match(/\/plugins\/([^/]+)\//)?.[1]).filter(Boolean), portalPlaces);
+setPortals(pluginsHere, portalPlaces);
+panelsOf = pluginsHere.filter((p) => p.panel?.id);
 forming.start(portalNames()); // (each forming in its place until its ring is there: see forming.js)
-for (const url of pluginUrls) {
-  const name = url.match(/\/plugins\/([^/]+)\//)?.[1];
+for (const { url, name } of pluginsHere) {
   try {
     // (each its own game, the same but for knowing whose it is: its dimensions are its, and so is its lock)
     const own = Object.create(game, { plugin: { value: name } });
