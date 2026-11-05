@@ -57,6 +57,7 @@ warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
 
 ((EUID == 0)) || die "run it as root (sudo $0 ...)"
+trap 'die "stopped at line $LINENO: $BASH_COMMAND (exit $?); nothing after it was done"' ERR
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 [[ -f $SRC/server.js && -f $SRC/package.json ]] || die "$SRC is not vvoid's checkout"
 name_ok='^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
@@ -195,6 +196,7 @@ env_put VVOID_PANEL_SYSTEMD vvoid.service
 [[ -n $PANEL_DOMAIN ]] && env_put VVOID_PANEL_ORIGIN "https://$PANEL_DOMAIN"
 chown "$SVC_USER:$SVC_USER" "$ENV"
 chmod 0600 "$ENV"
+say "settings in $ENV (root's or $SVC_USER's to read: sudo -u $SVC_USER nano $ENV, or the panel)"
 PORT=$(env_get PORT); PORT=${PORT:-5173}
 PANEL_PORT=$(env_get VVOID_PANEL_PORT); PANEL_PORT=${PANEL_PORT:-5174}
 
