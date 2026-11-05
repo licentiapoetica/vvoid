@@ -1902,7 +1902,7 @@ function frameWork(now) {
   back.touring = back.afoot = false; // (fly says so again, while a plugin flies you; a plugin moving you on foot, in its update: see back.js)
   back.post = null; // (and a plugin keeping it at a place, in its update too)
   back.terrified = back.joy = back.chill = false; back.sees = null; // (and a plugin frightening it, delighting it, or putting it at its ease: see back.js's feel)
-  back.pin = null; back.size = 1; // (and a plugin keeping it exactly somewhere, and its size: see back.js)
+  back.pin = null; back.size = 1; back.hidden = false; // (and a plugin keeping it exactly somewhere, and its size, or hiding it: see back.js)
   if (!started) { idle(elapsed); for (const p of plugins) p.idle?.(dt); } // (what they have in the hub moves behind the start screen too)
   else if (!locks.asking && !hook("busy")) fly(dt); // something of a plugin's is open (a piece, a game): stay where you are
   pushOut(dt); // (turned away from a locked portal: see lockedOut)

@@ -192,6 +192,7 @@ export class Back {
     this.chill = false;                  // a plugin's say, set each frame: it is at its ease where it is (in a corner of a plugin's platform as a song is played or watched)
     this.sees = null;                    // a plugin's say, set each frame: what it watches there, chilling (points in the world, the first the most)
     this.pin = null;                     // a plugin's: exactly where it is this frame (it does not travel there: at the side of your view, never through a wall)
+    this.hidden = false;                 // a plugin's: away this frame (it goes, as it goes when there is nowhere to take you)
     this.size = 1;                       // a plugin's: how big it is (and its smoke, its embers, the dark you click), set each frame
     this.speed = new THREE.Vector3();    // and how it is going, beside you (see place)
     this.keen = 1.7;
@@ -367,7 +368,7 @@ export class Back {
     }
 
     // (there once there is somewhere to go back to, in the hub, or wherever a plugin keeps it: company, at least)
-    const want = started && (this.next || this.atHub() || this.pin) ? 1 : 0;
+    const want = started && !this.hidden && (this.next || this.atHub() || this.pin) ? 1 : 0; // (not while a plugin hides it: see main.js)
     if (want && this.shown <= 0.01) this.place(camera, true); // (coming, it comes at your side, not from wherever it was last)
     this.shown += (want - this.shown) * Math.min(1, dt * 2.5);
     const visible = this.shown > 0.01;
