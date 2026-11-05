@@ -111,8 +111,9 @@ On Debian 13, from the checkout to be served (its `plugins/` too: they are not i
     sudo deploy/install.sh --domain void.example.org --email you@example.org
 
 That installs Node.js (24, from NodeSource: Debian's 20 is too old), what the plugins call (ffmpeg,
-Chromium, ImageMagick, yt-dlp from upstream, updated daily), copies vvoid to `/opt/vvoid` to run as its own
-user, writes `.env` (from `.env.example` the first time; what is set there is kept), and sets up systemd units
+Chromium, ImageMagick, yt-dlp from upstream, updated daily), runs vvoid right where the checkout is, as the
+user who owns it (`--dir` copies it elsewhere instead, to run as a user of its own), adds to its `.env` what it
+needs (made from `.env.example` if there is none; what is set there is kept), and sets up systemd units
 for vvoid and the panel (`vvoid`, `vvoid-panel`; the panel restarts vvoid through a sudoers line of its own),
 and nginx in front, on https with Let's Encrypt. It ends by printing the addresses, the admin link and the
 panel's key. `--panel-domain panel.example.org` serves the panel through nginx too (otherwise it is reached

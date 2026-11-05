@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 # vvoid on a Debian 13 server, in one command: Node.js, the tools the plugins call, a user of its own,
 # systemd units for vvoid and its panel, and nginx in front of it (on https, with Let's Encrypt, given an
-# email). Run it again, from a newer checkout, to update: the code is copied over; .env and .cache are kept.
+# email). vvoid runs right where this checkout is, as the user who owns it (its .env, .cache and plugins/ as
+# they are); --dir copies it elsewhere instead. Run it again to update.
 #
 #   sudo deploy/install.sh --domain void.example.org --email you@example.org
-#
-# Run it from the checkout you want served, plugins/ and all: plugins are kept out of git, so whatever is in
-# this checkout's plugins/ is what the server gets.
 set -euo pipefail
 
-DIR=/opt/vvoid
-SVC_USER=vvoid
+DIR=""
+SVC_USER=""
 DOMAIN=""
 PANEL_DOMAIN=""
 EMAIL=""
@@ -28,8 +26,8 @@ usage: sudo $0 [options]
   --panel-domain NAME  the panel on its own address too (https: needs --email); without it the panel stays on
                        this machine's 127.0.0.1:5174, reached through ssh -L 5174:localhost:5174
   --api-key KEY        ANTHROPIC_API_KEY (else asked for, if it is not in .env yet; or set it in the panel)
-  --dir DIR            where vvoid is installed (default $DIR)
-  --user NAME          the user it runs as (default $SVC_USER)
+  --dir DIR            copy vvoid there and run it from there (default: run it right here, in this checkout)
+  --user NAME          the user it runs as (default: the checkout's owner; with --dir, vvoid, made if need be)
   --no-extras          skip ffmpeg, chromium, imagemagick and yt-dlp (only plugins need them)
   --no-nginx           leave nginx alone: vvoid and the panel on 127.0.0.1 only, for a proxy of your own
                        (pass it X-Real-IP, X-Forwarded-For and -Proto, and websockets; see the README)
@@ -70,9 +68,15 @@ else
   [[ -z $DOMAIN && -z $EMAIL ]] || die "--domain and --email are for the nginx it sets up: not with --no-nginx"
   # (--panel-domain still says where your own proxy serves the panel, on https: VVOID_PANEL_ORIGIN)
 fi
-[[ $SVC_USER =~ ^[a-z_][a-z0-9_-]*$ ]] || die "--user: a user name, not $SVC_USER"
-DIR=$(realpath -m "$DIR")
-case $DIR in /home/*|/root|/root/*) die "--dir: not under /home or /root (the units keep those read-only)" ;; esac
+[[ $SVC_USER =~ ^[a-z_][a-z0-9_.-]*$ ]] || die "--user: a user name, not $SVC_USER"
+# (under /home or /root it has to write where it is: the units keep home folders read-only only elsewhere)
+PROTECT_HOME="ProtectHome=read-only"
+case $DIR in /home/*|/root|/root/*) PROTECT_HOME="" ;; esac
+if [[ -z $DIR ]]; then DIR=$SRC; else DIR=$(realpath -m "$DIR"); fi
+if [[ -z $SVC_USER ]]; then
+  owner=$(stat -c %U "$SRC")
+  if [[ $DIR == "$SRC" && $owner != root ]]; then SVC_USER=$owner; else SVC_USER=vvoid; fi
+fi
 TLS=0; [[ -n $EMAIL ]] && TLS=1
 
 # shellcheck source=/dev/null
@@ -156,13 +160,16 @@ SVC_HOME=$(getent passwd "$SVC_USER" | cut -d: -f6)
 as_svc() { runuser -u "$SVC_USER" -- env HOME="$SVC_HOME" PATH="$PATH" "$@"; }
 
 # ---- the code ----
-install -d -m 0755 "$DIR"
-if [[ $(realpath "$SRC") != "$DIR" ]]; then
+say "vvoid in $DIR, as $SVC_USER"
+if [[ $SRC != "$DIR" ]]; then
+  install -d -m 0755 "$DIR"
   say "copying $SRC to $DIR"
   rsync -a --exclude=/.git/ --exclude=node_modules/ --exclude=/.cache/ --exclude=/.env --exclude=/.vscode/ --exclude=/.claude/ "$SRC/" "$DIR/"
 fi
 [[ -d $DIR/plugins ]] && compgen -G "$DIR/plugins/*/server.js" >/dev/null || warn "no plugins in $DIR/plugins: they are kept out of git, so copy them into the checkout you run this from"
-chown -R "$SVC_USER:$SVC_USER" "$DIR"
+# (a copy, or a checkout someone else owns: made its user's)
+[[ $(stat -c %U "$DIR") == "$SVC_USER" ]] || chown -R "$SVC_USER:$(id -gn "$SVC_USER")" "$DIR"
+[[ $DIR != /opt/vvoid && -d /opt/vvoid ]] && warn "an earlier install is still in /opt/vvoid (its own .env and .cache): the units run $DIR now; once nothing there is wanted, sudo rm -rf /opt/vvoid"
 
 # ---- .env: made from .env.example the first time; what is set there already is kept ----
 ENV=$DIR/.env
@@ -193,8 +200,11 @@ env_default VVOID_PANEL_HOST 127.0.0.1
 env_default VVOID_ADMIN_KEY "$(secret)"
 env_default VVOID_PANEL_KEY "$(secret)"
 env_put VVOID_PANEL_SYSTEMD vvoid.service
-[[ -n $PANEL_DOMAIN ]] && env_put VVOID_PANEL_ORIGIN "https://$PANEL_DOMAIN"
-chown "$SVC_USER:$SVC_USER" "$ENV"
+if [[ -n $PANEL_DOMAIN ]]; then
+  env_put VVOID_PANEL_ORIGIN "https://$PANEL_DOMAIN"
+  ((NGINX)) && env_put VVOID_PANEL_HOST 127.0.0.1 # (nginx is in front of it: nothing else should reach it)
+fi
+chown "$SVC_USER:$(id -gn "$SVC_USER")" "$ENV"
 chmod 0600 "$ENV"
 say "settings in $ENV (root's or $SVC_USER's to read: sudo -u $SVC_USER nano $ENV, or the panel)"
 PORT=$(env_get PORT); PORT=${PORT:-5173}
@@ -223,7 +233,6 @@ After=network-online.target
 [Service]
 Type=simple
 User=$SVC_USER
-Group=$SVC_USER
 WorkingDirectory=$DIR
 ExecStart=$NODE --env-file-if-exists=.env server.js
 Restart=on-failure
@@ -232,7 +241,7 @@ LimitNOFILE=65536
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
-ProtectHome=read-only
+$PROTECT_HOME
 
 [Install]
 WantedBy=multi-user.target
@@ -247,14 +256,13 @@ After=network-online.target vvoid.service
 [Service]
 Type=simple
 User=$SVC_USER
-Group=$SVC_USER
 WorkingDirectory=$DIR
 ExecStart=$NODE panel.js
 Restart=on-failure
 RestartSec=3
 PrivateTmp=true
 ProtectSystem=full
-ProtectHome=read-only
+$PROTECT_HOME
 # (no NoNewPrivileges: it restarts vvoid through sudo)
 
 [Install]
@@ -397,6 +405,6 @@ cat <<EOF
             (the key makes the first passkey, and nothing once there is one)
 settings:   $ENV (or the panel)
 logs:       journalctl -u vvoid -f      journalctl -u vvoid-panel -f
-update:     git pull in your checkout, then this again
+update:     git pull, then this again
 EOF
 ((TLS)) || [[ -z $DOMAIN ]] || echo "https:     run this again with --email you@example.org (a headset's WebXR needs https)"
