@@ -104,6 +104,21 @@ from it too, or restarted there (then running from the panel, its log read there
 | `VVOID_PANEL_SYSTEMD` | none | the systemd unit vvoid runs as (`vvoid`, `vvoid.service`): the panel's start, stop and restart are that unit's (`systemctl`), its state is shown, and its journal is the log; the panel starts no vvoid of its own then. A system unit, as the panel's user: through polkit, else `sudo -n` (a sudoers line such as `kibi ALL=(root) NOPASSWD: /usr/bin/systemctl restart vvoid.service`, one for each of start, stop and restart wanted); its journal, the panel's user in `systemd-journal` |
 | `VVOID_PANEL_SYSTEMD_USER` | off | `1`: that unit is one of the panel's user's own (`systemctl --user`) |
 
+### On a server
+
+On Debian 13, from the checkout to be served (its `plugins/` too: they are not in git):
+
+    sudo deploy/install.sh --domain void.example.org --email you@example.org
+
+That installs Node.js (24, from NodeSource: Debian's 20 is too old), what the plugins call (ffmpeg,
+Chromium, ImageMagick, yt-dlp from upstream, updated daily), copies vvoid to `/opt/vvoid` to run as its own
+user, writes `.env` (from `.env.example` the first time; what is set there is kept), and sets up systemd units
+for vvoid and the panel (`vvoid`, `vvoid-panel`; the panel restarts vvoid through a sudoers line of its own),
+and nginx in front, on https with Let's Encrypt. It ends by printing the addresses, the admin link and the
+panel's key. `--panel-domain panel.example.org` serves the panel through nginx too (otherwise it is reached
+through `ssh -L 5174:localhost:5174`); `--no-nginx` leaves nginx alone, for a proxy of your own;
+`--no-extras` skips the plugins' tools; `--help` lists the rest. Run it again to update.
+
 ## Other doors
 
 Round the clock at the origin there is room for more rings. Each is a plugin, a folder in `plugins/`:
