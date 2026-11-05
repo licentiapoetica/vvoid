@@ -351,8 +351,12 @@ export class VoidAudio {
   // A media element playing in the world (a plugin's: see main.js): its sound goes through the master
   // (volume, mute, the analyser, the entity's bending), at a level set by whoever plays it. Returns
   // that level's gain, or null before start.
+  // The element itself at full volume: how loud it is heard is vvoid's to say from here (its volume, the
+  // mix, the gain), not the browser's default for a page's media (Firefox's media.default_volume, at
+  // 0.03, had every post at a thirtieth of itself, and its sound waves, measured after it, all but gone).
   mediaOut(el) {
     if (!this.ctx) return null;
+    el.volume = 1;
     const gain = this.ctx.createGain();
     gain.gain.value = 0;
     const source = this.ctx.createMediaElementSource(el);
