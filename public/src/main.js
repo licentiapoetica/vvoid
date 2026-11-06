@@ -61,6 +61,27 @@ renderer.renderBufferDirect = function (camera, scene, geometry, material, objec
 };
 
 const scene = new THREE.Scene();
+// Where everything is (its matrices) worked out each frame for what is shown, not for what is hidden: three.js goes
+// through every object before it draws, hidden or not, and the dimensions not being visited (each plugin's, hidden
+// at the top of the scene) are most of them, about 1500 of 1800 in the hub: two thirds of a millisecond a frame in
+// Firefox. One hidden one in turn each time all the same, so none is more than a second or two behind, for what
+// reads a hidden thing's matrixWorld straight off (getWorldPosition and the like work theirs out themselves); one
+// shown is brought up to date before it is drawn. What a plugin draws itself goes through here too (its draw hook)
+let hiddenTurn = 0;
+scene.updateMatrixWorld = function (force) {
+  if (this.matrixAutoUpdate) this.updateMatrix();
+  if (this.matrixWorldNeedsUpdate || force) {
+    this.matrixWorld.copy(this.matrix);
+    this.matrixWorldNeedsUpdate = false;
+    force = true;
+  }
+  const children = this.children, turn = hiddenTurn++ % Math.max(1, children.length);
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (child.visible || i === turn) child.updateMatrixWorld(force);
+    else if (force) child.matrixWorldNeedsUpdate = true; // (moved with the scene: its whole subtree again, when its time comes)
+  }
+};
 // the headset (see xr.js) and what it shows in place of the page's words (vrhud.js): made once the rest is
 let xr = null, vrHud = null;
 const camera = new THREE.PerspectiveCamera(70, 1, 1, CELL * 3.4); // far enough to see into the next sectors

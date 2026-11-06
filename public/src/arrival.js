@@ -12,6 +12,8 @@ const GATHER = 7;   // s over which its glow and the cloud of its hole thicken (
 const OPEN = 1.9;   // s, opening out past the edges
 const LEAVE = 0.6;  // s, let go without opening (a password asked first: see main.js)
 const TINTS = 8;    // motes from the void's violet to pale, hot on the circle
+const SLOW_DRAW = 3;     // ms a frame its drawing may take, before it is drawn at fewer pixels
+const LEAST_SCALE = 0.5; // and at the fewest, of its full size each way
 
 const ease = (t) => t * t * (3 - 2 * t);
 const smooth = (a, b, v) => ease(Math.min(1, Math.max(0, (v - a) / (b - a))));
@@ -25,6 +27,7 @@ export class Arrival {
     this.ctx = this.canvas.getContext("2d");
     this.textEl = el.querySelector("p");
     this.state = null; // "forming", "opening" or "leaving" (null: none)
+    this.scale = 1; // of its full size each way (lowered where it is slow to draw: see update)
     this.motes = Array.from({ length: MOTES }, (_, i) => ({ angle: (i / MOTES) * Math.PI * 2 + Math.random() * 0.3, seed: Math.random() }));
     // a soft mote in each tint, drawn once
     this.sprites = Array.from({ length: TINTS }, (_, i) => {
@@ -74,11 +77,21 @@ export class Arrival {
       this.el.classList.remove("on", "opening");
       return;
     }
+    // Drawn at fewer pixels where drawing it is slow: Firefox paints a canvas with the processor, here a whole screen
+    // of it each frame, five to six milliseconds of every frame at full size; Chromium hands it to the card, and
+    // takes no time over it here, so it stays sharp there. Its glows and motes are soft, and lose little; once
+    // lowered, it stays so (each change of size is a hitch of its own)
+    const began = performance.now();
     this.draw();
+    this.took = (this.took ?? 0) * 0.8 + (performance.now() - began) * 0.2;
+    if (this.took > SLOW_DRAW && this.scale > LEAST_SCALE && (this.lowered = (this.lowered ?? 0) + 1) >= 8) {
+      this.scale = Math.max(LEAST_SCALE, this.scale * 0.75);
+      this.took = this.lowered = 0;
+    }
   }
 
   draw() {
-    const { canvas, ctx, t, end } = this, w = innerWidth, h = innerHeight, ratio = Math.min(devicePixelRatio, 1.5);
+    const { canvas, ctx, t, end } = this, w = innerWidth, h = innerHeight, ratio = Math.min(devicePixelRatio, 1.5) * this.scale;
     if (canvas.width !== Math.round(w * ratio) || canvas.height !== Math.round(h * ratio)) Object.assign(canvas, { width: Math.round(w * ratio), height: Math.round(h * ratio) });
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.085, far = Math.hypot(w, h) / 2 + R * 2;
@@ -88,17 +101,20 @@ export class Arrival {
     const r = mix(R, far, ease(opening) ** 1.4), hole = r * ease(Math.min(1, opening * 2.4));
     const fade = (1 - smooth(0.45, 1, opening)) * (1 - leaving);
 
-    ctx.globalCompositeOperation = "source-over";
+    // (each pixel filled as few times as it can be: a canvas is painted by the processor in Firefox, a whole screen
+    // of it at a time, where Chromium's card does it; the picture is the same)
     ctx.globalAlpha = 1;
-    ctx.clearRect(0, 0, w, h);
-    // the dark, and the cloud of its hole gathering in the circle
+    // the dark (the last frame's replaced, not cleared first and then covered), and the cloud of its hole
+    // gathering in the circle (nothing past its edge: only the square round it filled)
+    ctx.globalCompositeOperation = "copy";
     ctx.fillStyle = `rgba(0,0,0,${1 - leaving})`;
     ctx.fillRect(0, 0, w, h);
-    const cloud = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.15);
+    ctx.globalCompositeOperation = "source-over";
+    const reach = r * 1.15, cloud = ctx.createRadialGradient(cx, cy, 0, cx, cy, reach);
     cloud.addColorStop(0, `rgba(34,18,80,${(0.45 * grow * show * fade).toFixed(3)})`);
     cloud.addColorStop(1, "rgba(34,18,80,0)");
     ctx.fillStyle = cloud;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(cx - reach, cy - reach, 2 * reach, 2 * reach);
     // the place, seen through it
     if (hole > 0.5) {
       ctx.globalCompositeOperation = "destination-out";

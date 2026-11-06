@@ -119,9 +119,11 @@ export class Worms {
 
   update(dt, camera) {
     const G = this.world.G, eye = camera.position;
-    this.group.visible = G.uSolid.value > 0.5;
-    if (!this.group.visible) { this.placed = false; return; }
     const t = G.uTime.value, show = G.uBlocksLit.value, out = Math.min(COUNT, Math.round(look.wormCount));
+    // (none out, the default: nothing drawn, and nothing sent to the card each frame. Its two strips were sent
+    // whole every frame regardless, 480 KB of them, which Firefox carries over to its GPU process at a cost)
+    this.group.visible = G.uSolid.value > 0.5 && out > 0;
+    if (!this.group.visible) { this.placed = false; return; }
     const NEAR = (this.near = look.wormNear), FAR = (this.far = Math.max(look.wormFar, NEAR + 100)), STEP = look.wormTrail / SAMPLES;
     this.out = out;
     for (const w of this.worms) {
@@ -199,7 +201,12 @@ export class Worms {
       w.pos.toArray(this.headPositions, w.i * 3);
       w.colour.toArray(this.headColours, w.i * 3);
     }
+    // (only the worms out sent to the card, not all COUNT strips' room)
     const g = this.trails.geometry.attributes, h = this.heads.geometry.attributes;
-    g.position.needsUpdate = g.aColor.needsUpdate = h.position.needsUpdate = h.aColor.needsUpdate = true;
+    for (const [a, n] of [[g.position, this.out * strip * 3], [g.aColor, this.out * strip * 3], [h.position, this.out * 3], [h.aColor, this.out * 3]]) {
+      a.clearUpdateRanges();
+      a.addUpdateRange(0, n);
+      a.needsUpdate = true;
+    }
   }
 }
