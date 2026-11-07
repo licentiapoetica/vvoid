@@ -932,6 +932,40 @@ async function comePortal(name) {
   for (let waited = 0; forming.has(name) && waited < 8000; waited += 100) await new Promise((done) => setTimeout(done, 100));
   if (world.realm === "void") flyIntoPortal({ name, at }, true);
 }
+// A link straight into a plugin's own dimension (a song in it, a replay): its server writes the start screen, the
+// link's own card in place of vvoid's, with the plugin's name (data-into). Going in, nothing of the hub is seen or
+// heard: the dark, and a portal forming in it (as for a place shared), for as long as that plugin is on its way;
+// it puts you in its dimension and says so (arrived: see the plugins' game), and the portal opens on it. Not
+// taken in time (the plugin missing or failed, or held), the dark lifts on the hub, as ever.
+const into = $("start").dataset.into || null;
+const INTO_WAIT = 8000; // ms, once the plugins are in, for it to take you (its password being asked: longer)
+let intoComing = false;
+function comeInto() {
+  intoComing = true;
+  audio.keepDown("into", 0);
+  document.body.classList.add("arriving");
+  if (!xr?.on && !standalone()) arrival.form($("start").dataset.intoSaid || `into ${into}`);
+  pluginsIn.then(() => {
+    const since = performance.now();
+    const check = () => {
+      if (!intoComing) return;
+      if (locks.asking || performance.now() - since < INTO_WAIT) return void setTimeout(check, 250);
+      intoArrived(false);
+      note("the link could not take you in: you are in the hub");
+    };
+    check();
+  });
+}
+// put there (or not: the dark lifts as it is); true when the jump was hidden in the portal's dark
+function intoArrived(there = true) {
+  if (!intoComing) return false;
+  intoComing = false;
+  const done = () => { audio.keepDown("into"); document.body.classList.remove("arriving"); };
+  if (there && arrival.open(() => { audio.sting(); done(); })) return (veil = 0, true);
+  if (arrival.on) arrival.leave();
+  done();
+  return false;
+}
 // the Tab panel's share: a link to here (the dimension, the room in it, where you are and which way you
 // face), copied (on a touch screen, handed to its own sharing)
 async function shareHere() {
@@ -964,17 +998,18 @@ function start() {
   // a place shared with you (see comeShared); else a chosen place to start, set on the map; else right where
   // the start screen's turning view is, as it is (no jump: you simply take over), in the hub, looking at the clock
   if (sharedAt) comeShared(sharedAt);
+  else if (into) comeInto();
   else if (portalAsked) comePortal(portalAsked);
   else if (map.spawn) teleport(map.spawn.realm, map.spawn.x, map.spawn.y, map.spawn.z);
   map.visit(world.currentKey); // where you begin counts as explored
-  voice.arrived(); // (someone it knows, it greets)
-  if (playerName) back.greet(playerName); // (and Irrlicht, by the name given on the start screen)
+  if (!into) voice.arrived(); // (someone it knows, it greets; not on the way into a song)
+  if (playerName && !into) back.greet(playerName); // (and Irrlicht, by the name given on the start screen)
   $("start").classList.add("gone");
   document.querySelector("#start .player input").blur(); // (started some other way, a key must fly, not type)
   $("hud").classList.add("on");
   $("crosshair").classList.add("on", "woken"); // (there at once: the moment you are in, you can aim)
   document.body.classList.add("started"); // (the touch screen's menu button shows from now: see index.html)
-  wakeHud(9); // where you begin, named a while (with the HUD's slow first reveal)
+  if (!into) wakeHud(9); // where you begin, named a while (with the HUD's slow first reveal)
 }
 // the Tab panel, on a touch screen: its button opens it and closes it again
 $("menuButton").addEventListener("click", () => {
@@ -2090,7 +2125,7 @@ xr.supported().then((yes) => {
   vrSupported = yes;
   if (yes) world.warm(camera, null); // (the sectors' shaders as the headset draws them: see World.warm)
   showVrButton();
-  if (yes && standalone()) $("prompt").textContent = "click to materialize · in the headset";
+  if (yes && standalone() && !into) $("prompt").textContent = "click to materialize · in the headset";
 });
 
 // The plugins (see the top), installed once the game around them is ready: what they are given.
@@ -2109,6 +2144,9 @@ const game = {
   locks,                                    // its password, if it has one: locked(name), ask(name) at its portal (see locks.js)
   lasers, fireLaser,                        // beams (see laser.js): a plugin may shoot, draw another's, or listen
   started: () => started,
+  // On the way in by a link into this plugin's dimension (see into): put there, it says so, and the portal opens
+  // on it; true when the jump is hidden so (no veil, no sting of its own wanted), false when not on such a way
+  arrived() { return into === this?.plugin && intoArrived(); },
   player: () => playerName,                 // the name the traveller gave on the start screen ("" if none)
   aiming,                                  // flying, the pointer held, no map open
   mapOpen: () => map.open,

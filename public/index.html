@@ -242,6 +242,30 @@
   @keyframes said { from { opacity: 0; } }
   #start #sharedTo { margin-top: 1.2em; font-size: 12px; letter-spacing: .2em; opacity: .6; color: #c9b8ff; animation: none; }
   #start #sharedTo:empty { display: none; }
+  /* a link straight into a plugin's own dimension (a song, a replay): its own card, alone in the dark, in place of
+     vvoid's (its server writes it: see into in main.js) */
+  #start.into { background: #04030c; overflow: hidden; }
+  #start.into::before {
+    content: ""; position: absolute; inset: -12%; background: var(--cover, none) center / cover;
+    filter: blur(70px) saturate(1.4) brightness(.32); opacity: .9;
+  }
+  #start.into::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(4,3,12,0) 30%, rgba(4,3,12,.85) 100%); }
+  #start.into > div { position: relative; z-index: 1; display: grid; justify-items: center; padding: 0 16px; max-width: 640px; }
+  #start.into .cover {
+    width: min(46vmin, 260px); aspect-ratio: 1; object-fit: cover; border-radius: 10px; margin-bottom: 1.6em;
+    box-shadow: 0 0 0 1px rgba(201,184,255,.18), 0 18px 60px rgba(0,0,0,.6), 0 0 80px rgba(140,82,255,.25);
+  }
+  #start.into h2 { margin: 0; font-weight: 300; font-size: clamp(22px, 4.6vw, 38px); line-height: 1.2; letter-spacing: .06em; color: #f4eeff; text-shadow: 0 0 30px rgba(140,82,255,.5); }
+  #start.into p.about { margin: .5em 0 0; font-size: 13px; letter-spacing: .12em; opacity: .7; animation: none; text-transform: none; }
+  #start.into p.about + p.about { margin-top: .3em; font-size: 12px; opacity: .5; }
+  #start.into p.go {
+    margin-top: 2em; padding: .7em 1.8em; border: 1px solid rgba(160,120,255,.6); border-radius: 999px; background: rgba(140,82,255,.14);
+    color: #f4eeff; font-size: 15px; letter-spacing: .2em; opacity: 1; box-shadow: 0 0 24px rgba(140,82,255,.3);
+  }
+  #start.into #prompt, #start.into #sharedTo, #start.into .player { display: none; }
+  #start.into .volume { margin-top: 2em; opacity: .5; }
+  /* going in by it: nothing of vvoid's own over the dark, until the plugin has put you in its dimension */
+  body.arriving #hud, body.arriving #crosshair, body.arriving #irrlicht, body.arriving #note, body.arriving #menuButton { visibility: hidden; }
   #hint {
     position: fixed; left: 0; right: 0; top: 14vh; text-align: center; pointer-events: none; font-family: monospace;
     font-size: 14px; letter-spacing: .06em; color: #00ffff; text-shadow: 0 0 10px #00ffff;
