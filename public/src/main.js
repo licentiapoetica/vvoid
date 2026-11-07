@@ -455,11 +455,15 @@ for (const type of ["keydown", "keyup"]) $("gSens").addEventListener(type, (e) =
 // window is; unset, vvoid's own (70 up and down). The lens still widens at speed and narrows zoomed in,
 // from there; and the mouse turns the view as far for the same push, however wide it is.
 const OWN_TALL = 70;
+// (on a phone held upright, 60 across instead: 70 up and down there is barely 35 across, a view through a
+// slot; on its side, vvoid's own as yet)
+const PHONE = matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 600;
+const ownAcross = () => (PHONE && camera.aspect < 1 ? 60 : null);
 const tallFor = (across) => THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(across) / 2) / camera.aspect));
 const acrossFor = (tall) => THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(tall) / 2) * camera.aspect));
-const baseFov = () => (gfx.fov ? tallFor(gfx.fov) : OWN_TALL);
+const baseFov = () => (gfx.fov ? tallFor(gfx.fov) : ownAcross() ? tallFor(ownAcross()) : OWN_TALL);
 function showFov() {
-  const across = gfx.fov ?? Math.round(acrossFor(OWN_TALL));
+  const across = gfx.fov ?? ownAcross() ?? Math.round(acrossFor(OWN_TALL));
   $("gFov").value = across;
   $("gFovOut").textContent = `${Math.round(across)}°${gfx.fov ? "" : " (vvoid's)"}`;
 }
